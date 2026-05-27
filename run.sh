@@ -1,0 +1,1 @@
+g++ -std=c++20 -Iinclude src/*.cpp "main.cpp" -o "main" && "./main"
