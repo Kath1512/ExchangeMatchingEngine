@@ -1,6 +1,6 @@
-#include "trade.h"
-#include "types.h"
-#include "order.h"
+#include "orderbook/trade.h"
+#include "orderbook/types.h"
+#include "orderbook/order.h"
 #include <vector>
 
 //TradeInfo implementation

@@ -20,7 +20,7 @@ void check_trades(const TradeHistory&              actual,
 
 // ── check_levels ─────────────────────────────────────────────────────────────
 
-void check_levels(const OrderBook&                  book,
+void check_levels(const TestBook&                   book,
                   const std::vector<ExpectedLevel>& expected) {
     // Tally how many bid/ask levels we expect, then verify the totals.
     // Any unexpected resting level is caught here as a count mismatch.
@@ -48,7 +48,8 @@ void run_order_book_test(const OrderBookTestCase& tc, bool logging = false) {
     dd::current_test = tc.name;
     std::cout << "[DD] " << tc.name << "\n";
 
-    OrderBook book;
+    VectorSink sink;
+    TestBook book(sink);
     for (const TestInput& input : tc.inputs) {
         book.process_message(input);
     }

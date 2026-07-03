@@ -11,6 +11,7 @@ using Quantity = std::int64_t;
 using TradeId = std::uint64_t;
 using AtomicBool = std::atomic<bool>;
 using Counter = std::int64_t;
+using ErrorCode = std::uint8_t;
 
 enum class Side {
     Buy,

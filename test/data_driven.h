@@ -1,14 +1,15 @@
 #pragma once
-#include "order_book.h"
-#include "order.h"
-#include "types.h"
+#include "orderbook/order_book.h"
+#include "orderbook/order.h"
+#include "orderbook/types.h"
 #include <iostream>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <variant>
 #include <vector>
-#include "order_messages.h"
+#include "orderbook/order_messages.h"
+#include "test_sink.h"
 
 // ════════════════════════════════════════════════════════════════════════════
 //  Data-driven test framework for OrderBook
@@ -95,7 +96,7 @@ void check_trades(const TradeHistory&              actual,
                   const std::vector<ExpectedTrade>& expected);
 
 // Verify final book levels (per-level quantity/count + total level count).
-void check_levels(const OrderBook&                  book,
+void check_levels(const TestBook&                   book,
                   const std::vector<ExpectedLevel>& expected);
 
 // Build a fresh book, replay all inputs, then call check_trades + check_levels.

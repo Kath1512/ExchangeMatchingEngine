@@ -16,8 +16,6 @@
 #include "trade.h"
 #include "order_messages.h"
 #include "order_event.h"
-#include "ring_buffer.h"
-#include "constant.h"
 
 
 struct OrderLocation {
@@ -103,22 +101,16 @@ using TradeHistory = std::vector<Trade>;
 using AskLevels = std::map<Price, PriceLevel>;
 using BidLevels = std::map<Price, PriceLevel, std::greater<Price>>;
 using OrderLookUp = std::unordered_map<OrderId, OrderLocation>;
-using EventQueue = std::queue<Event>;
-using MaybeEvent = std::optional<Event>;
-using Mutex = std::mutex;
-using EventRingBuffer = RingBuffer<Event, RING_BUFFER_SIZE>;
 
+template<typename EventSink>
 class OrderBook{
 private:
     BidLevels bids_;
     AskLevels asks_;
     TradeHistory trades_;
     OrderLookUp order_look_up_;
-    // EventQueue event_queue_;
-    // Mutex event_mtx_; //need improvement -> use lock free
     // std::condition_variable event_cv_;
-    Counter drop_events_count_;
-    EventRingBuffer ring_buffer_;
+    EventSink& event_sink_;
 
     static inline bool cmp_buy(const Price buy, const Price sell){
         return buy >= sell;
@@ -130,6 +122,7 @@ private:
 
     
 public:
+    OrderBook(EventSink& event_sink);
     bool is_empty() const;
     bool has_bids() const;
     bool has_asks() const;
@@ -280,12 +273,7 @@ public:
 
     //Event control
     
-    // MaybeEvent wait_and_pop_event(AtomicBool& running);
-    // void notify_events_shutdown();
-    
-    bool has_event() const;
     bool add_event(Event event);
-    bool pop_event(Event& storage);
 
     //debug method
     template<typename Levels>
@@ -306,7 +294,10 @@ public:
     std::string to_string() const;
     std::string trades_to_string() const;
 
-    friend std::ostream& operator << (std::ostream& os, const OrderBook& order_book);
+    template<typename ES>
+    friend std::ostream& operator<<(std::ostream& os, const OrderBook<ES>& book);
 };
 
 std::ostream& operator << (std::ostream& os, const AddOrderResult& result);
+
+#include "order_book.tpp"

@@ -1,9 +1,12 @@
 #include <iostream>
 #include <thread>
 #include <vector>
-#include "order_book.h"
-#include "order_messages.h"
-#include "event_consumer.h"
+#include <mutex>
+#include "orderbook/order_book.h"
+#include "orderbook/ring_buffer.h"
+#include "orderbook/constant.h"
+#include "orderbook/order_messages.h"
+#include "test_sink.h"
 
 #define CHECK(expr)                                          \
     do {                                                     \
@@ -15,25 +18,18 @@
         }                                                    \
     } while (false)
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-static bool pop_expect(OrderBook& book, auto&& checker) {
-    Event ev;
-    if (!book.pop_event(ev)) return false;
-    return std::visit(checker, ev);
-}
-
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 bool test_add_order_emits_accepted()
 {
-    OrderBook book;
+    VectorSink sink;
+    TestBook book(sink);
     book.process_message(AddOrder{OrderType::Limit, TimeInForce::GoodTillCancel, 1, 100, 10, Side::Buy});
 
-    CHECK(book.has_event());
+    CHECK(!sink.empty());
 
     Event ev;
-    CHECK(book.pop_event(ev));
+    CHECK(sink.pop(ev));
     CHECK(std::holds_alternative<OrderAccepted>(ev));
     CHECK(std::get<OrderAccepted>(ev).order_id == 1);
 
@@ -42,16 +38,17 @@ bool test_add_order_emits_accepted()
 
 bool test_cancel_order_emits_canceled()
 {
-    OrderBook book;
+    VectorSink sink;
+    TestBook book(sink);
     book.process_message(AddOrder{OrderType::Limit, TimeInForce::GoodTillCancel, 1, 100, 10, Side::Buy});
 
     Event ev;
-    book.pop_event(ev);   // consume the accepted event
+    sink.pop(ev);   // consume the accepted event
 
     book.process_message(CancelOrder{1});
 
-    CHECK(book.has_event());
-    CHECK(book.pop_event(ev));
+    CHECK(!sink.empty());
+    CHECK(sink.pop(ev));
     CHECK(std::holds_alternative<OrderCanceled>(ev));
     CHECK(std::get<OrderCanceled>(ev).order_id == 1);
 
@@ -60,11 +57,12 @@ bool test_cancel_order_emits_canceled()
 
 bool test_cancel_unknown_order_emits_rejected()
 {
-    OrderBook book;
+    VectorSink sink;
+    TestBook book(sink);
     book.process_message(CancelOrder{999});
 
     Event ev;
-    CHECK(book.pop_event(ev));
+    CHECK(sink.pop(ev));
     CHECK(std::holds_alternative<OrderRejected>(ev));
 
     return true;
@@ -72,25 +70,26 @@ bool test_cancel_unknown_order_emits_rejected()
 
 bool test_matching_trade_emits_trade_executed()
 {
-    OrderBook book;
+    VectorSink sink;
+    TestBook book(sink);
     Event ev;
 
     // Resting ask → emits OrderAccepted{1}
     book.process_message(AddOrder{OrderType::Limit, TimeInForce::GoodTillCancel, 1, 100, 10, Side::Sell});
-    book.pop_event(ev);
+    sink.pop(ev);
     CHECK(std::holds_alternative<OrderAccepted>(ev));
     CHECK(std::get<OrderAccepted>(ev).order_id == 1);
 
     // Aggressing buy → emits TradeExecuted first, then OrderAccepted{2}
     book.process_message(AddOrder{OrderType::Limit, TimeInForce::GoodTillCancel, 2, 100, 10, Side::Buy});
 
-    CHECK(book.pop_event(ev));
+    CHECK(sink.pop(ev));
     CHECK(std::holds_alternative<TradeExecuted>(ev));
     const auto& trade = std::get<TradeExecuted>(ev);
     CHECK(trade.price == 100);
     CHECK(trade.quantity == 10);
 
-    CHECK(book.pop_event(ev));
+    CHECK(sink.pop(ev));
     CHECK(std::holds_alternative<OrderAccepted>(ev));
     CHECK(std::get<OrderAccepted>(ev).order_id == 2);
 
@@ -99,7 +98,8 @@ bool test_matching_trade_emits_trade_executed()
 
 bool test_event_fifo_order()
 {
-    OrderBook book;
+    VectorSink sink;
+    TestBook book(sink);
 
     book.process_message(AddOrder{OrderType::Limit, TimeInForce::GoodTillCancel, 1, 100, 10, Side::Buy});
     book.process_message(AddOrder{OrderType::Limit, TimeInForce::GoodTillCancel, 2, 90,  10, Side::Buy});
@@ -107,16 +107,15 @@ bool test_event_fifo_order()
 
     Event ev;
 
-    // First two should be OrderAccepted for order 1 and 2
-    CHECK(book.pop_event(ev));
+    CHECK(sink.pop(ev));
     CHECK(std::holds_alternative<OrderAccepted>(ev));
     CHECK(std::get<OrderAccepted>(ev).order_id == 1);
 
-    CHECK(book.pop_event(ev));
+    CHECK(sink.pop(ev));
     CHECK(std::holds_alternative<OrderAccepted>(ev));
     CHECK(std::get<OrderAccepted>(ev).order_id == 2);
 
-    CHECK(book.pop_event(ev));
+    CHECK(sink.pop(ev));
     CHECK(std::holds_alternative<OrderAccepted>(ev));
     CHECK(std::get<OrderAccepted>(ev).order_id == 3);
 
@@ -125,22 +124,24 @@ bool test_event_fifo_order()
 
 bool test_concurrent_consumer()
 {
-    OrderBook book;
+    // Concurrent test uses the real ring buffer sink since VectorSink is not thread-safe
+    RingBuffer<Event, 128> buffer;
+    OrderBook<RingBuffer<Event, 128>> book(buffer);
+
     AtomicBool running{true};
     std::vector<Event> received;
     std::mutex received_mtx;
 
     std::thread consumer([&]() {
         Event ev;
-        while (running || book.has_event()) {
-            if (book.pop_event(ev)) {
+        while (running || !buffer.empty()) {
+            if (buffer.pop(ev)) {
                 std::lock_guard<std::mutex> lock(received_mtx);
                 received.push_back(ev);
             }
         }
     });
 
-    // Producer: submit 10 orders on the main thread
     for (int i = 1; i <= 10; ++i) {
         book.process_message(AddOrder{OrderType::Limit, TimeInForce::GoodTillCancel, (OrderId)i, 100, 10, Side::Buy});
     }

@@ -1,11 +1,10 @@
-#include "order_book.h"
-#include <event_consumer.h>
+#include "orderbook/event_consumer.h"
 
-void consume_events(OrderBook& book, AtomicBool& running) {
+void consume_events(DefaultSink& sink, AtomicBool& running) {
     Event item;
     int cnt = 0;
-    while (running || book.has_event()) {
-        bool success = book.pop_event(item);
+    while (running || !sink.empty()) {
+        bool success = sink.pop(item);
         cnt++;
 
         if(!success) continue;

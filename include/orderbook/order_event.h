@@ -5,10 +5,17 @@
 //Trade executed Event
 
 #include "types.h"
-#include <string>
 #include <variant>
 #include <ostream>
 #include <format>
+
+enum class RejectReason : uint8_t {
+    NoLiquidity      = 1,
+    InvalidOrderId   = 2,
+    DuplicateOrderId = 3,
+    InvalidParams    = 4,
+    Unknown          = 255,
+};
 
 struct OrderAccepted {
     OrderId order_id;
@@ -16,7 +23,7 @@ struct OrderAccepted {
 
 struct OrderRejected {
     OrderId order_id;
-    std::string reason;
+    RejectReason reason;
 };
 
 struct OrderCanceled {
@@ -25,7 +32,7 @@ struct OrderCanceled {
 
 struct CancelRejected {
     OrderId order_id;
-    std::string reason;
+    RejectReason reason;
 };
 
 struct OrderModified {
@@ -36,7 +43,7 @@ struct OrderModified {
 
 struct ModifyRejected {
     OrderId order_id;
-    std::string reason;
+    RejectReason reason;
 };
 
 struct TradeExecuted {
@@ -60,6 +67,8 @@ std::ostream& operator << (std::ostream& os, const OrderModified& ev);
 std::ostream& operator << (std::ostream& os, const ModifyRejected& ev);
 
 std::ostream& operator << (std::ostream& os, const TradeExecuted& ev);
+
+std::string to_string(RejectReason reason);
 
 using Event = std::variant<
     OrderAccepted,

@@ -1,0 +1,5 @@
+CompileFlags:
+  Add:
+    - "-Iinclude"
+    - "-Itest"
+    - "-std=c++20"

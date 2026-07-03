@@ -1,4 +1,5 @@
-#include "order_event.h"
+#include "orderbook/order_event.h"
+
 
 
 std::ostream& operator << (std::ostream& os, const OrderAccepted& ev){
@@ -10,7 +11,7 @@ std::ostream& operator << (std::ostream& os, const OrderRejected& ev){
     os << std::format(
         "Rejected order {} | Reason: {}",
         ev.order_id,
-        ev.reason
+        to_string(ev.reason)
     );
     return os;
 }
@@ -22,9 +23,9 @@ std::ostream& operator << (std::ostream& os, const OrderCanceled& ev){
 
 std::ostream& operator << (std::ostream& os, const CancelRejected& ev){
     os << std::format(
-        "Rejected cancelling order {} | Reason: {}", 
+        "Rejected cancelling order {} | Reason: {}",
         ev.order_id,
-        ev.reason
+        to_string(ev.reason)
     );
     return os;
 }
@@ -43,7 +44,7 @@ std::ostream& operator << (std::ostream& os, const ModifyRejected& ev){
     os << std::format(
         "Rejected modifying order {} | Reason: {}",
         ev.order_id,
-        ev.reason
+        to_string(ev.reason)
     );
     return os;
 }
@@ -58,4 +59,15 @@ std::ostream& operator << (std::ostream& os, const TradeExecuted& ev){
     );
 
     return os;
+}
+
+std::string to_string(RejectReason reason){
+    switch(reason){
+        case RejectReason::NoLiquidity:      return "NoLiquidity";
+        case RejectReason::InvalidOrderId:   return "InvalidOrderId";
+        case RejectReason::DuplicateOrderId: return "DuplicateOrderId";
+        case RejectReason::InvalidParams:    return "InvalidParams";
+        case RejectReason::Unknown:          return "Unknown";
+    }
+    return "Unknown";
 }
