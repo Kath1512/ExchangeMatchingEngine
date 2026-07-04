@@ -8,6 +8,10 @@ MaybeEvent recv_event(int fd){
         return std::nullopt;
     }
 
+    if(got == 0){
+        return std::nullopt;
+    }
+
     EventT event;
     bool ok = deserialise(buf.data(), event);
     if(!ok){
@@ -23,6 +27,12 @@ void run_parser(int fd, DefaultSink& sink, AtomicBool& running){
         auto got = recv_all(fd, reinterpret_cast<uint8_t*>(&header), sizeof(MsgHeader));
         if(got == -1){
             std::cerr << "Error\n";
+            break;
+        }
+
+        if(got == 0){
+            std::cerr << "Connection closed\n";
+            running = false;
             break;
         }
         auto [type, payload_len] = header;
