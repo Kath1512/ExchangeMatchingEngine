@@ -2,10 +2,10 @@
 
 void consume_events(DefaultSink& sink, AtomicBool& running) {
     Event item;
-    int cnt = 0;
+    // int cnt = 0;
     while (running || !sink.empty()) {
         bool success = sink.pop(item);
-        cnt++;
+        // cnt++;
 
         if(!success) continue;
 
@@ -14,5 +14,5 @@ void consume_events(DefaultSink& sink, AtomicBool& running) {
         }, item);
     }
 
-    std::cout << "Total loops: " << cnt << "\n";
+    // std::cout << "Total loops: " << cnt << "\n";
 }

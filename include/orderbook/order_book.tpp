@@ -231,7 +231,7 @@ void OrderBook<EventSink>::process(const CancelOrder& cancel_order_msg){
     OrderId id = cancel_order_msg.id;
 
     if(!cancelled){
-        add_event(OrderRejected{ .order_id = id, .reason = RejectReason::InvalidOrderId });
+        add_event(CancelRejected{ .order_id = id, .reason = RejectReason::InvalidOrderId });
         return;
     }
     add_event(OrderCanceled{ .order_id = id });
