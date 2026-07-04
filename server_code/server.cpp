@@ -125,32 +125,3 @@ int main(){
     close(socket_fd);
 
 }
-
-// messages = {                                                                                                                                                                     
-//         AddOrder{OrderType::Limit, TimeInForce::GoodTillCancel, 1, 100, 10, Side::Buy},                                                                                                                   
-//         AddOrder{OrderType::Limit, TimeInForce::GoodTillCancel, 2, 100, 5,  Side::Sell},  // partial fill                                                                                                 
-//         AddOrder{OrderType::Limit, TimeInForce::GoodTillCancel, 3, 99,  20, Side::Buy},                                                                                                                   
-//         ModifyOrder{1, 101, 5},                                                                                                                                                                           
-//         CancelOrder{3},                                                                                                                                                                                   
-//         AddOrder{OrderType::Limit, TimeInForce::ImmediateOrCancel, 4, 99, 20, Side::Sell},                                                                                                                
-// };  
-
-//   1                                                                                                                                                                                                     
-//   1 100 10 0 1                                                                                                                                                                                          
-                                                                                                                                                                                                        
-//   1                                                                                                                                                                                                     
-//   2 100 5 1 1                                                                                                                                                                                           
-                                                                                                                                                                                                        
-//   1                                                                                                                                                                                                     
-//   3 99 20 0 1                                                                                                                                                                                          
-
-//   2
-//   1 101 5
-
-//   3
-//   3
-                                                                                                                                                                                                        
-//   1                                                                                                                                                                                                     
-//   4 99 20 1 2                                                                                                                                                                                           
-                                                                                                                                                                                                        
-//   -1      
