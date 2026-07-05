@@ -27,6 +27,33 @@ Server will print `Client connected`. Events will print on the client terminal a
 
 ---
 
+## Project structure
+
+```
+include/
+    orderbook/           — order book headers (types, order, price level, ring buffer, etc.)
+    networking/
+        transport/
+            itransport.h — Transport concept (TCP/UDP must satisfy this)
+            tcp.h        — TCP setup declarations
+        protocol.h       — binary wire protocol (ser/deser)
+        sender.h         — run_sender declaration
+        parser.h         — run_parser declaration
+        socket_utils.h   — send_all, recv_all, got_error
+        input_handler.h  — read_message (stdin → Message)
+networking/
+    transport/
+        tcp.cpp          — setup_server, setup_client
+    sender.cpp           — pops events from ring buffer, serialises, sends
+    parser.cpp           — receives bytes, deserialises, pushes to ring buffer
+    input_handler.cpp    — reads one Message from stdin
+src/                     — order book implementations
+server_code/server.cpp   — server main: tcp setup + book + stdin + sender thread
+client_code/client.cpp   — client main: tcp setup + parser + consumer threads
+```
+
+---
+
 ## Message format
 
 The server reads from stdin. Each message is two lines:

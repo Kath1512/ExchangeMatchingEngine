@@ -131,15 +131,61 @@ target_compile_options(test_runner PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(test_runner PRIVATE order_book_lib)
 
 
+# ── Networking library ────────────────────────────────────────────────────────
+#
+# Compiles all networking code (sender, parser, transport) into a static lib.
+# Depends on order_book_lib for Event, DefaultSink, etc.
+
+add_library(networking_lib STATIC
+    networking/sender.cpp
+    networking/parser.cpp
+    networking/input_handler.cpp
+    networking/transport/tcp.cpp
+)
+
+target_compile_options(networking_lib PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(networking_lib PUBLIC order_book_lib)
+
+
+# ── Server executable ─────────────────────────────────────────────────────────
+
+add_executable(server server_code/server.cpp)
+target_compile_options(server PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(server PRIVATE networking_lib)
+
+
+# ── Client executable ─────────────────────────────────────────────────────────
+
+add_executable(client client_code/client.cpp)
+target_compile_options(client PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(client PRIVATE networking_lib)
+
+
 # ── CTest integration ─────────────────────────────────────────────────────────
 #
 # CTest is CMake's built-in test runner. After enabling it:
-#   `ctest --test-dir build`   runs all registered tests.
-#   `ctest --test-dir build -V` runs them with verbose output.
+#   `ctest --test-dir build`            runs all tests.
+#   `ctest --test-dir build -R pattern` runs tests matching the pattern.
+#   `ctest --test-dir build -V`         verbose output.
 #
-# add_test registers test_runner as one test named "order_book_tests".
-# CMake treats a non-zero exit code from test_runner as a test failure,
-# which matches our data_driven_summary() returning 0 or 1.
+# Each add_test registers one executable as one named test.
+# A non-zero exit code = test failure.
 
 enable_testing()
+
+# Order book — data-driven tests (17 named cases)
 add_test(NAME order_book_tests COMMAND test_runner)
+
+# Ring buffer — standalone, only needs order_book_lib (ring_buffer.h lives there)
+add_executable(test_ring_buffer test/test_ring_buffer.cpp)
+target_include_directories(test_ring_buffer PRIVATE test)
+target_compile_options(test_ring_buffer PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(test_ring_buffer PRIVATE order_book_lib)
+add_test(NAME ring_buffer_tests COMMAND test_ring_buffer)
+
+# Event pipeline — tests OrderBook + EventSink integration
+add_executable(test_event_pipeline test/test_event_pipeline.cpp)
+target_include_directories(test_event_pipeline PRIVATE test)
+target_compile_options(test_event_pipeline PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(test_event_pipeline PRIVATE order_book_lib)
+add_test(NAME event_pipeline_tests COMMAND test_event_pipeline)

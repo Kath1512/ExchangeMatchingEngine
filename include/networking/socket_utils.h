@@ -33,7 +33,7 @@ inline ssize_t send_all(int fd, const uint8_t* buf, size_t len){
 inline ssize_t recv_all(int fd, uint8_t* buf, size_t len){
     ssize_t slen = static_cast<ssize_t>(len);
     ssize_t recved = 0;
-    while(recved < len){
+    while(recved < slen){
         ssize_t cur_recved = recv(fd, buf + recved, slen - recved, 0);
 
         if(cur_recved == -1){
