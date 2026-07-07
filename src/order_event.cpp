@@ -71,6 +71,16 @@ std::ostream& operator << (std::ostream& os, const TradeExecuted& ev){
     return os;
 }
 
+std::ostream& operator << (std::ostream& os, const BookUpdate& ev){
+    os << std::format(
+        "BookUpdate {} @ {} -> qty={}",
+        ev.side == Side::Buy ? "Bid" : "Ask",
+        ev.price,
+        ev.new_total_quantity
+    );
+    return os;
+}
+
 std::string to_string(RejectReason reason){
     switch(reason){
         case RejectReason::NoLiquidity:      return "NoLiquidity";

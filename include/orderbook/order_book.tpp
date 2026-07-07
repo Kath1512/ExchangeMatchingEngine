@@ -164,6 +164,9 @@ Quantity OrderBook<EventSink>::execute_trade(Order& incoming_order, PriceLevel& 
 
     if(getFilled) remove_look_up(front_order_id);
 
+    Side counterpart_side = incoming_order.is_buy() ? Side::Sell : Side::Buy;
+    add_event(BookUpdate{ counterpart_side, counterpart_level.get_price(), counterpart_level.get_total_quantity() });
+
     return execution_quantity;
 }
 

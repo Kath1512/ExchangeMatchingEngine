@@ -145,6 +145,7 @@ public:
         if(order.is_filled()) return true; 
 
         Price price = order.get_price();
+        Side side = order.get_side();
 
         auto [it, inserted_in_level] = levels.try_emplace(price, price);
 
@@ -156,6 +157,7 @@ public:
             order_it.value()
         );
 
+        add_event(BookUpdate{ side, price, it->second.get_total_quantity() });
 
         return inserted_in_look_up;
     }
@@ -221,9 +223,12 @@ public:
         PriceLevel& level = level_it->second;
         level.erase_order(order_it);
         //remove price level if empty
+        Quantity new_qty = level.empty() ? 0 : level.get_total_quantity();
         if(level.empty()){
             levels.erase(level_it);
         }
+
+        add_event(BookUpdate{ side, price, new_qty });
 
         return true;
     }

@@ -26,9 +26,12 @@ bool test_add_order_emits_accepted()
     TestBook book(sink);
     book.process_message(AddOrder{OrderType::Limit, TimeInForce::GoodTillCancel, 1, 100, 10, Side::Buy});
 
-    CHECK(!sink.empty());
-
     Event ev;
+    // BookUpdate fires first (level created), then OrderRested
+    CHECK(sink.pop(ev));
+    CHECK(std::holds_alternative<BookUpdate>(ev));
+    CHECK(std::get<BookUpdate>(ev).new_total_quantity == 10);
+
     CHECK(sink.pop(ev));
     CHECK(std::holds_alternative<OrderRested>(ev));
     CHECK(std::get<OrderRested>(ev).order_id == 1);
@@ -44,11 +47,16 @@ bool test_cancel_order_emits_canceled()
     book.process_message(AddOrder{OrderType::Limit, TimeInForce::GoodTillCancel, 1, 100, 10, Side::Buy});
 
     Event ev;
-    sink.pop(ev);   // consume the accepted event
+    sink.pop(ev);   // consume BookUpdate
+    sink.pop(ev);   // consume OrderRested
 
     book.process_message(CancelOrder{1});
 
-    CHECK(!sink.empty());
+    // BookUpdate fires first (level gone, qty=0), then OrderCanceled
+    CHECK(sink.pop(ev));
+    CHECK(std::holds_alternative<BookUpdate>(ev));
+    CHECK(std::get<BookUpdate>(ev).new_total_quantity == 0);
+
     CHECK(sink.pop(ev));
     CHECK(std::holds_alternative<OrderCanceled>(ev));
     CHECK(std::get<OrderCanceled>(ev).order_id == 1);
@@ -75,13 +83,14 @@ bool test_matching_trade_emits_trade_executed()
     TestBook book(sink);
     Event ev;
 
-    // Resting ask → emits OrderRested{1}
+    // Resting ask → BookUpdate{Ask,100,10}, OrderRested{1}
     book.process_message(AddOrder{OrderType::Limit, TimeInForce::GoodTillCancel, 1, 100, 10, Side::Sell});
-    sink.pop(ev);
+    sink.pop(ev);   // BookUpdate
+    sink.pop(ev);   // OrderRested
     CHECK(std::holds_alternative<OrderRested>(ev));
     CHECK(std::get<OrderRested>(ev).order_id == 1);
 
-    // Aggressing buy (full fill) → emits TradeExecuted then OrderFilled{2}
+    // Aggressing buy (full fill) → TradeExecuted, BookUpdate{Ask,100,0}, OrderFilled{2}
     book.process_message(AddOrder{OrderType::Limit, TimeInForce::GoodTillCancel, 2, 100, 10, Side::Buy});
 
     CHECK(sink.pop(ev));
@@ -89,6 +98,10 @@ bool test_matching_trade_emits_trade_executed()
     const auto& trade = std::get<TradeExecuted>(ev);
     CHECK(trade.price == 100);
     CHECK(trade.quantity == 10);
+
+    CHECK(sink.pop(ev));
+    CHECK(std::holds_alternative<BookUpdate>(ev));
+    CHECK(std::get<BookUpdate>(ev).new_total_quantity == 0);
 
     CHECK(sink.pop(ev));
     CHECK(std::holds_alternative<OrderFilled>(ev));
@@ -108,14 +121,18 @@ bool test_event_fifo_order()
 
     Event ev;
 
+    // Each add: BookUpdate then OrderRested
+    CHECK(sink.pop(ev)); CHECK(std::holds_alternative<BookUpdate>(ev));
     CHECK(sink.pop(ev));
     CHECK(std::holds_alternative<OrderRested>(ev));
     CHECK(std::get<OrderRested>(ev).order_id == 1);
 
+    CHECK(sink.pop(ev)); CHECK(std::holds_alternative<BookUpdate>(ev));
     CHECK(sink.pop(ev));
     CHECK(std::holds_alternative<OrderRested>(ev));
     CHECK(std::get<OrderRested>(ev).order_id == 2);
 
+    CHECK(sink.pop(ev)); CHECK(std::holds_alternative<BookUpdate>(ev));
     CHECK(sink.pop(ev));
     CHECK(std::holds_alternative<OrderRested>(ev));
     CHECK(std::get<OrderRested>(ev).order_id == 3);
@@ -150,9 +167,10 @@ bool test_concurrent_consumer()
     running = false;
     consumer.join();
 
-    CHECK((int)received.size() == 10);
+    // Each of 10 orders emits BookUpdate + OrderRested = 20 events total
+    CHECK((int)received.size() == 20);
     for (const auto& e : received) {
-        CHECK(std::holds_alternative<OrderRested>(e));
+        CHECK(std::holds_alternative<BookUpdate>(e) || std::holds_alternative<OrderRested>(e));
     }
 
     return true;

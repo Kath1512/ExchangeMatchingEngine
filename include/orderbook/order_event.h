@@ -66,6 +66,12 @@ struct TradeExecuted {
     Side aggressive_side;
 };
 
+struct BookUpdate {
+    Side side;
+    Price price;
+    Quantity new_total_quantity;  // 0 means level is gone
+};
+
 std::ostream& operator << (std::ostream& os, const OrderRested& ev);
 std::ostream& operator << (std::ostream& os, const OrderFilled& ev);
 std::ostream& operator << (std::ostream& os, const OrderExpired& ev);
@@ -81,6 +87,7 @@ std::ostream& operator << (std::ostream& os, const OrderModified& ev);
 std::ostream& operator << (std::ostream& os, const ModifyRejected& ev);
 
 std::ostream& operator << (std::ostream& os, const TradeExecuted& ev);
+std::ostream& operator << (std::ostream& os, const BookUpdate& ev);
 
 std::string to_string(RejectReason reason);
 
@@ -93,5 +100,6 @@ using Event = std::variant<
     CancelRejected,
     OrderModified,
     ModifyRejected,
-    TradeExecuted
+    TradeExecuted,
+    BookUpdate
 >;

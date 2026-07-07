@@ -15,6 +15,7 @@ enum class MsgType : uint8_t {
     OrderModified  = 7,
     ModifyRejected = 8,
     TradeExecuted  = 9,
+    BookUpdate     = 10,
 };
 
 // ── Header ────────────────────────────────────────────────────────────────────
@@ -73,6 +74,12 @@ struct __attribute__((packed)) WireTradeExecuted {
     int64_t  price;
     int64_t  quantity;
     uint8_t  aggressive_side;
+};
+
+struct __attribute__((packed)) WireBookUpdate {
+    uint8_t  side;
+    int64_t  price;
+    int64_t  new_total_quantity;
 };
 
 // ── Serialise ─────────────────────────────────────────────────────────────────
@@ -165,6 +172,19 @@ inline std::size_t serialise(const TradeExecuted& ev, uint8_t* out) {
     return sizeof(header) + sizeof(wire);
 }
 
+// BookUpdate
+inline std::size_t serialise(const BookUpdate& ev, uint8_t* out) {
+    MsgHeader header{ MsgType::BookUpdate, sizeof(WireBookUpdate) };
+    WireBookUpdate wire{
+        static_cast<uint8_t>(ev.side == Side::Buy ? 0 : 1),
+        ev.price,
+        ev.new_total_quantity
+    };
+    std::memcpy(out, &header, sizeof(header));
+    std::memcpy(out + sizeof(header), &wire, sizeof(wire));
+    return sizeof(header) + sizeof(wire);
+}
+
 // ── Deserialise ───────────────────────────────────────────────────────────────
 // src must point to start of payload (after header).
 
@@ -250,5 +270,15 @@ inline bool deserialise(const uint8_t* src, TradeExecuted& ev) {
     ev.price           = wire.price;
     ev.quantity        = wire.quantity;
     ev.aggressive_side = wire.aggressive_side == 0 ? Side::Buy : Side::Sell;
+    return true;
+}
+
+// BookUpdate
+inline bool deserialise(const uint8_t* src, BookUpdate& ev) {
+    WireBookUpdate wire;
+    std::memcpy(&wire, src, sizeof(wire));
+    ev.side               = wire.side == 0 ? Side::Buy : Side::Sell;
+    ev.price              = wire.price;
+    ev.new_total_quantity = wire.new_total_quantity;
     return true;
 }

@@ -16,7 +16,8 @@ void run_sender(int fd, DefaultSink& sink, AtomicBool& running){
             [fd](const CancelRejected& event) { return send_event<WireCancelRejected>(fd, event); },
             [fd](const OrderModified& event)  { return send_event<WireOrderModified>(fd, event); },
             [fd](const ModifyRejected& event) { return send_event<WireModifyRejected>(fd, event); },
-            [fd](const TradeExecuted& event)  { return send_event<WireTradeExecuted>(fd, event); }
+            [fd](const TradeExecuted& event)  { return send_event<WireTradeExecuted>(fd, event); },
+            [fd](const BookUpdate& event)     { return send_event<WireBookUpdate>(fd, event); }
         }, item);
         if(!ok) break;
     }

@@ -85,6 +85,11 @@ void run_parser(int fd, DefaultSink& sink, AtomicBool& running){
                 if(e) sink.push(std::move(e.value()));
                 break;
             }
+            case MsgType::BookUpdate: {
+                MaybeEvent e = recv_event<WireBookUpdate, BookUpdate>(fd);
+                if(e) sink.push(std::move(e.value()));
+                break;
+            }
             default:
                 std::cerr << "Unknown message type\n";
                 break;
