@@ -17,8 +17,20 @@ enum class RejectReason : uint8_t {
     Unknown          = 255,
 };
 
-struct OrderAccepted {
+struct OrderRested {
     OrderId order_id;
+    OrderId client_order_id;
+    Quantity remaining_quantity;
+};
+
+struct OrderFilled {
+    OrderId order_id;
+    OrderId client_order_id;
+};
+
+struct OrderExpired {
+    OrderId order_id;
+    OrderId client_order_id;
 };
 
 struct OrderRejected {
@@ -54,7 +66,9 @@ struct TradeExecuted {
     Side aggressive_side;
 };
 
-std::ostream& operator << (std::ostream& os, const OrderAccepted& ev);
+std::ostream& operator << (std::ostream& os, const OrderRested& ev);
+std::ostream& operator << (std::ostream& os, const OrderFilled& ev);
+std::ostream& operator << (std::ostream& os, const OrderExpired& ev);
 
 std::ostream& operator << (std::ostream& os, const OrderRejected& ev);
 
@@ -71,7 +85,9 @@ std::ostream& operator << (std::ostream& os, const TradeExecuted& ev);
 std::string to_string(RejectReason reason);
 
 using Event = std::variant<
-    OrderAccepted,
+    OrderRested,
+    OrderFilled,
+    OrderExpired,
     OrderRejected,
     OrderCanceled,
     CancelRejected,

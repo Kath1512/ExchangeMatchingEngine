@@ -30,8 +30,9 @@ bool test_add_order_emits_accepted()
 
     Event ev;
     CHECK(sink.pop(ev));
-    CHECK(std::holds_alternative<OrderAccepted>(ev));
-    CHECK(std::get<OrderAccepted>(ev).order_id == 1);
+    CHECK(std::holds_alternative<OrderRested>(ev));
+    CHECK(std::get<OrderRested>(ev).order_id == 1);
+    CHECK(std::get<OrderRested>(ev).remaining_quantity == 10);
 
     return true;
 }
@@ -63,7 +64,7 @@ bool test_cancel_unknown_order_emits_rejected()
 
     Event ev;
     CHECK(sink.pop(ev));
-    CHECK(std::holds_alternative<OrderRejected>(ev));
+    CHECK(std::holds_alternative<CancelRejected>(ev));
 
     return true;
 }
@@ -74,13 +75,13 @@ bool test_matching_trade_emits_trade_executed()
     TestBook book(sink);
     Event ev;
 
-    // Resting ask → emits OrderAccepted{1}
+    // Resting ask → emits OrderRested{1}
     book.process_message(AddOrder{OrderType::Limit, TimeInForce::GoodTillCancel, 1, 100, 10, Side::Sell});
     sink.pop(ev);
-    CHECK(std::holds_alternative<OrderAccepted>(ev));
-    CHECK(std::get<OrderAccepted>(ev).order_id == 1);
+    CHECK(std::holds_alternative<OrderRested>(ev));
+    CHECK(std::get<OrderRested>(ev).order_id == 1);
 
-    // Aggressing buy → emits TradeExecuted first, then OrderAccepted{2}
+    // Aggressing buy (full fill) → emits TradeExecuted then OrderFilled{2}
     book.process_message(AddOrder{OrderType::Limit, TimeInForce::GoodTillCancel, 2, 100, 10, Side::Buy});
 
     CHECK(sink.pop(ev));
@@ -90,8 +91,8 @@ bool test_matching_trade_emits_trade_executed()
     CHECK(trade.quantity == 10);
 
     CHECK(sink.pop(ev));
-    CHECK(std::holds_alternative<OrderAccepted>(ev));
-    CHECK(std::get<OrderAccepted>(ev).order_id == 2);
+    CHECK(std::holds_alternative<OrderFilled>(ev));
+    CHECK(std::get<OrderFilled>(ev).order_id == 2);
 
     return true;
 }
@@ -108,16 +109,16 @@ bool test_event_fifo_order()
     Event ev;
 
     CHECK(sink.pop(ev));
-    CHECK(std::holds_alternative<OrderAccepted>(ev));
-    CHECK(std::get<OrderAccepted>(ev).order_id == 1);
+    CHECK(std::holds_alternative<OrderRested>(ev));
+    CHECK(std::get<OrderRested>(ev).order_id == 1);
 
     CHECK(sink.pop(ev));
-    CHECK(std::holds_alternative<OrderAccepted>(ev));
-    CHECK(std::get<OrderAccepted>(ev).order_id == 2);
+    CHECK(std::holds_alternative<OrderRested>(ev));
+    CHECK(std::get<OrderRested>(ev).order_id == 2);
 
     CHECK(sink.pop(ev));
-    CHECK(std::holds_alternative<OrderAccepted>(ev));
-    CHECK(std::get<OrderAccepted>(ev).order_id == 3);
+    CHECK(std::holds_alternative<OrderRested>(ev));
+    CHECK(std::get<OrderRested>(ev).order_id == 3);
 
     return true;
 }
@@ -151,7 +152,7 @@ bool test_concurrent_consumer()
 
     CHECK((int)received.size() == 10);
     for (const auto& e : received) {
-        CHECK(std::holds_alternative<OrderAccepted>(e));
+        CHECK(std::holds_alternative<OrderRested>(e));
     }
 
     return true;

@@ -24,15 +24,6 @@ Order::Order(OrderType order_type,
             // }
         }
 
-Order::Order(const AddOrder& msg)
-        : order_type_(msg.order_type),
-          time_in_force_(msg.time_in_force),
-          order_id_(msg.order_id),
-          price_(msg.price),
-          initial_quantity_(msg.quantity),
-          remaining_quantity_(msg.quantity),
-          side_(msg.side) {}
-
 Order::Order(const Order& other)
         : order_type_(other.get_order_type()),
         time_in_force_(other.get_time_in_force()),

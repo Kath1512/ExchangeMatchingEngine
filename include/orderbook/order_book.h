@@ -109,6 +109,7 @@ private:
     AskLevels asks_;
     TradeHistory trades_;
     OrderLookUp order_look_up_;
+    uint64_t next_order_id_ = 1;
     // std::condition_variable event_cv_;
     EventSink& event_sink_;
 

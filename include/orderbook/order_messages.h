@@ -6,7 +6,7 @@
 struct AddOrder {
     OrderType order_type;
     TimeInForce time_in_force;
-    OrderId order_id;
+    OrderId client_order_id;
     Price price;
     Quantity quantity;
     Side side;

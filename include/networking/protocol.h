@@ -6,13 +6,15 @@
 // ── Message type tags ─────────────────────────────────────────────────────────
 
 enum class MsgType : uint8_t {
-    OrderAccepted  = 1,
-    OrderRejected  = 2,
-    OrderCanceled  = 3,
-    CancelRejected = 4,
-    OrderModified  = 5,
-    ModifyRejected = 6,
-    TradeExecuted  = 7,
+    OrderRested    = 1,
+    OrderFilled    = 2,
+    OrderExpired   = 3,
+    OrderRejected  = 4,
+    OrderCanceled  = 5,
+    CancelRejected = 6,
+    OrderModified  = 7,
+    ModifyRejected = 8,
+    TradeExecuted  = 9,
 };
 
 // ── Header ────────────────────────────────────────────────────────────────────
@@ -24,8 +26,20 @@ struct __attribute__((packed)) MsgHeader {
 
 // ── Wire structs ──────────────────────────────────────────────────────────────
 
-struct __attribute__((packed)) WireOrderAccepted {
+struct __attribute__((packed)) WireOrderRested {
     uint64_t order_id;
+    uint64_t client_order_id;
+    int64_t  remaining_quantity;
+};
+
+struct __attribute__((packed)) WireOrderFilled {
+    uint64_t order_id;
+    uint64_t client_order_id;
+};
+
+struct __attribute__((packed)) WireOrderExpired {
+    uint64_t order_id;
+    uint64_t client_order_id;
 };
 
 struct __attribute__((packed)) WireOrderRejected {
@@ -64,10 +78,28 @@ struct __attribute__((packed)) WireTradeExecuted {
 // ── Serialise ─────────────────────────────────────────────────────────────────
 // Returns total bytes written. src must point to start of payload (after header).
 
-// OrderAccepted
-inline std::size_t serialise(const OrderAccepted& ev, uint8_t* out) {
-    MsgHeader header{ MsgType::OrderAccepted, sizeof(WireOrderAccepted) };
-    WireOrderAccepted wire{ ev.order_id };
+// OrderRested
+inline std::size_t serialise(const OrderRested& ev, uint8_t* out) {
+    MsgHeader header{ MsgType::OrderRested, sizeof(WireOrderRested) };
+    WireOrderRested wire{ ev.order_id, ev.client_order_id, ev.remaining_quantity };
+    std::memcpy(out, &header, sizeof(header));
+    std::memcpy(out + sizeof(header), &wire, sizeof(wire));
+    return sizeof(header) + sizeof(wire);
+}
+
+// OrderFilled
+inline std::size_t serialise(const OrderFilled& ev, uint8_t* out) {
+    MsgHeader header{ MsgType::OrderFilled, sizeof(WireOrderFilled) };
+    WireOrderFilled wire{ ev.order_id, ev.client_order_id };
+    std::memcpy(out, &header, sizeof(header));
+    std::memcpy(out + sizeof(header), &wire, sizeof(wire));
+    return sizeof(header) + sizeof(wire);
+}
+
+// OrderExpired
+inline std::size_t serialise(const OrderExpired& ev, uint8_t* out) {
+    MsgHeader header{ MsgType::OrderExpired, sizeof(WireOrderExpired) };
+    WireOrderExpired wire{ ev.order_id, ev.client_order_id };
     std::memcpy(out, &header, sizeof(header));
     std::memcpy(out + sizeof(header), &wire, sizeof(wire));
     return sizeof(header) + sizeof(wire);
@@ -136,11 +168,31 @@ inline std::size_t serialise(const TradeExecuted& ev, uint8_t* out) {
 // ── Deserialise ───────────────────────────────────────────────────────────────
 // src must point to start of payload (after header).
 
-// OrderAccepted
-inline bool deserialise(const uint8_t* src, OrderAccepted& ev) {
-    WireOrderAccepted wire;
+// OrderRested
+inline bool deserialise(const uint8_t* src, OrderRested& ev) {
+    WireOrderRested wire;
     std::memcpy(&wire, src, sizeof(wire));
-    ev.order_id = wire.order_id;
+    ev.order_id           = wire.order_id;
+    ev.client_order_id    = wire.client_order_id;
+    ev.remaining_quantity = wire.remaining_quantity;
+    return true;
+}
+
+// OrderFilled
+inline bool deserialise(const uint8_t* src, OrderFilled& ev) {
+    WireOrderFilled wire;
+    std::memcpy(&wire, src, sizeof(wire));
+    ev.order_id        = wire.order_id;
+    ev.client_order_id = wire.client_order_id;
+    return true;
+}
+
+// OrderExpired
+inline bool deserialise(const uint8_t* src, OrderExpired& ev) {
+    WireOrderExpired wire;
+    std::memcpy(&wire, src, sizeof(wire));
+    ev.order_id        = wire.order_id;
+    ev.client_order_id = wire.client_order_id;
     return true;
 }
 

@@ -203,14 +203,47 @@ bool OrderBook<EventSink>::modify_order(OrderId order_id, Price new_price, Quant
 
 template<typename EventSink>
 void OrderBook<EventSink>::process(const AddOrder& add_order_msg){
-    AddOrderResult res = add_order(Order(add_order_msg));
-    OrderId id = add_order_msg.order_id;
+    OrderId book_id = next_order_id_++;
+    OrderId cid = add_order_msg.client_order_id;
+    TimeInForce tif = add_order_msg.time_in_force;
 
-    if(res.status_ == AddOrderStatus::Failed || res.status_ == AddOrderStatus::Rejected){
-        add_event(OrderRejected{ .order_id = id, .reason = RejectReason::NoLiquidity });
-        return;
+    Order order(
+        add_order_msg.order_type,
+        tif,
+        book_id,
+        add_order_msg.price,
+        add_order_msg.quantity,
+        add_order_msg.side,
+        add_order_msg.seq
+    );
+    AddOrderResult res = add_order(std::move(order));
+
+    switch(res.status_){
+        case AddOrderStatus::Failed:
+        case AddOrderStatus::Rejected:
+            add_event(OrderRejected{ .order_id = book_id, .reason = RejectReason::NoLiquidity });
+            return;
+
+        case AddOrderStatus::FullyFilled:
+            add_event(OrderFilled{ .order_id = book_id, .client_order_id = cid });
+            return;
+
+        case AddOrderStatus::Resting:
+            if(tif == TimeInForce::ImmediateOrCancel){
+                add_event(OrderExpired{ .order_id = book_id, .client_order_id = cid });
+            } else {
+                add_event(OrderRested{ .order_id = book_id, .client_order_id = cid, .remaining_quantity = res.remaining_quantity_ });
+            }
+            return;
+
+        case AddOrderStatus::PartiallyFilled:
+            if(tif == TimeInForce::GoodTillCancel){
+                add_event(OrderRested{ .order_id = book_id, .client_order_id = cid, .remaining_quantity = res.remaining_quantity_ });
+            } else {
+                add_event(OrderExpired{ .order_id = book_id, .client_order_id = cid });
+            }
+            return;
     }
-    add_event(OrderAccepted{ .order_id = id });
 }
 
 template<typename EventSink>

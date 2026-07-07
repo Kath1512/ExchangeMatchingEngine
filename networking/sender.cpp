@@ -8,7 +8,9 @@ void run_sender(int fd, DefaultSink& sink, AtomicBool& running){
         if(!success) continue;
 
         bool ok = std::visit(overloaded{
-            [fd](const OrderAccepted& event)  { return send_event<WireOrderAccepted>(fd, event); },
+            [fd](const OrderRested& event)    { return send_event<WireOrderRested>(fd, event); },
+            [fd](const OrderFilled& event)    { return send_event<WireOrderFilled>(fd, event); },
+            [fd](const OrderExpired& event)   { return send_event<WireOrderExpired>(fd, event); },
             [fd](const OrderRejected& event)  { return send_event<WireOrderRejected>(fd, event); },
             [fd](const OrderCanceled& event)  { return send_event<WireOrderCanceled>(fd, event); },
             [fd](const CancelRejected& event) { return send_event<WireCancelRejected>(fd, event); },

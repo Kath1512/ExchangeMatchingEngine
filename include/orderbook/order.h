@@ -43,7 +43,6 @@ public:
           Side side,
           SequenceNumber sequence_number);
     
-    Order(const AddOrder& msg);
     Order(const Order& order);
 
     OrderType get_order_type() const;

@@ -40,8 +40,18 @@ void run_parser(int fd, DefaultSink& sink, AtomicBool& running){
         //receive payload
         
         switch (type){
-            case MsgType::OrderAccepted: {
-                MaybeEvent e = recv_event<WireOrderAccepted, OrderAccepted>(fd);
+            case MsgType::OrderRested: {
+                MaybeEvent e = recv_event<WireOrderRested, OrderRested>(fd);
+                if(e) sink.push(std::move(e.value()));
+                break;
+            }
+            case MsgType::OrderFilled: {
+                MaybeEvent e = recv_event<WireOrderFilled, OrderFilled>(fd);
+                if(e) sink.push(std::move(e.value()));
+                break;
+            }
+            case MsgType::OrderExpired: {
+                MaybeEvent e = recv_event<WireOrderExpired, OrderExpired>(fd);
                 if(e) sink.push(std::move(e.value()));
                 break;
             }

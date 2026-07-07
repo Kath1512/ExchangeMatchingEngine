@@ -2,8 +2,18 @@
 
 
 
-std::ostream& operator << (std::ostream& os, const OrderAccepted& ev){
-    os << std::format("Accepted order {}", ev.order_id);
+std::ostream& operator << (std::ostream& os, const OrderRested& ev){
+    os << std::format("Order {} rested (client_order_id={}) remaining={}", ev.order_id, ev.client_order_id, ev.remaining_quantity);
+    return os;
+}
+
+std::ostream& operator << (std::ostream& os, const OrderFilled& ev){
+    os << std::format("Order {} fully filled (client_order_id={})", ev.order_id, ev.client_order_id);
+    return os;
+}
+
+std::ostream& operator << (std::ostream& os, const OrderExpired& ev){
+    os << std::format("Order {} expired (client_order_id={})", ev.order_id, ev.client_order_id);
     return os;
 }
 

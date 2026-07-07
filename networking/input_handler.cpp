@@ -12,7 +12,7 @@ std::optional<Message> read_message(){
             Price price;
             Quantity quantity;
             int side, tif;
-            std::cout << "order_id price quantity side(0=Buy 1=Sell) tif(0=FOK 1=GTC 2=IOC): ";
+            std::cout << "client_order_id price quantity side(0=Buy 1=Sell) tif(0=FOK 1=GTC 2=IOC): ";
             std::cin >> id >> price >> quantity >> side >> tif;
             return AddOrder{
                 OrderType::Limit,
