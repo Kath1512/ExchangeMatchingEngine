@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <cstring>
 #include "orderbook/order_event.h"
+#include "orderbook/order_messages.h"
 
 // ── Message type tags ─────────────────────────────────────────────────────────
 
@@ -24,6 +25,8 @@ struct __attribute__((packed)) MsgHeader {
     MsgType  type;
     uint16_t payload_len;
 };
+
+//               Wire Event protocol (Server sending, client receiving)
 
 // ── Wire structs ──────────────────────────────────────────────────────────────
 
@@ -280,5 +283,106 @@ inline bool deserialise(const uint8_t* src, BookUpdate& ev) {
     ev.side               = wire.side == 0 ? Side::Buy : Side::Sell;
     ev.price              = wire.price;
     ev.new_total_quantity = wire.new_total_quantity;
+    return true;
+}
+
+//               Wire Order protocol (Client sending, Server receiving)
+
+// ── Message type tags ─────────────────────────────────────────────────────────
+
+enum class OrderMsgType : uint8_t {
+    AddOrder    = 1,
+    CancelOrder = 2,
+    ModifyOrder = 3,
+};
+
+// ── Header ────────────────────────────────────────────────────────────────────
+
+struct __attribute__((packed)) OrderMsgHeader {
+    OrderMsgType type;
+    uint16_t     payload_len;
+};
+
+// ── Wire structs ──────────────────────────────────────────────────────────────
+
+struct __attribute__((packed)) WireAddOrder {
+    uint8_t  order_type;
+    uint8_t  tif;
+    uint64_t client_order_id;
+    int64_t  price;
+    int64_t  quantity;
+    uint8_t  side;
+};
+
+struct __attribute__((packed)) WireCancelOrder {
+    uint64_t order_id;
+};
+
+struct __attribute__((packed)) WireModifyOrder {
+    uint64_t order_id;
+    int64_t  new_price;
+    int64_t  new_quantity;
+};
+
+// ── Serialise ─────────────────────────────────────────────────────────────────
+
+inline std::size_t serialise(const AddOrder& msg, uint8_t* out) {
+    OrderMsgHeader header{ OrderMsgType::AddOrder, sizeof(WireAddOrder) };
+    WireAddOrder wire{
+        static_cast<uint8_t>(msg.order_type),
+        static_cast<uint8_t>(msg.time_in_force),
+        msg.client_order_id,
+        msg.price,
+        msg.quantity,
+        static_cast<uint8_t>(msg.side)
+    };
+    std::memcpy(out, &header, sizeof(header));
+    std::memcpy(out + sizeof(header), &wire, sizeof(wire));
+    return sizeof(header) + sizeof(wire);
+}
+
+inline std::size_t serialise(const CancelOrder& msg, uint8_t* out) {
+    OrderMsgHeader header{ OrderMsgType::CancelOrder, sizeof(WireCancelOrder) };
+    WireCancelOrder wire{ msg.id };
+    std::memcpy(out, &header, sizeof(header));
+    std::memcpy(out + sizeof(header), &wire, sizeof(wire));
+    return sizeof(header) + sizeof(wire);
+}
+
+inline std::size_t serialise(const ModifyOrder& msg, uint8_t* out) {
+    OrderMsgHeader header{ OrderMsgType::ModifyOrder, sizeof(WireModifyOrder) };
+    WireModifyOrder wire{ msg.id, msg.new_price, msg.new_quantity };
+    std::memcpy(out, &header, sizeof(header));
+    std::memcpy(out + sizeof(header), &wire, sizeof(wire));
+    return sizeof(header) + sizeof(wire);
+}
+
+// ── Deserialise ───────────────────────────────────────────────────────────────
+
+inline bool deserialise(const uint8_t* src, AddOrder& msg) {
+    WireAddOrder wire;
+    std::memcpy(&wire, src, sizeof(wire));
+    msg.order_type      = static_cast<OrderType>(wire.order_type);
+    msg.time_in_force   = static_cast<TimeInForce>(wire.tif);
+    msg.client_order_id = wire.client_order_id;
+    msg.price           = wire.price;
+    msg.quantity        = wire.quantity;
+    msg.side            = static_cast<Side>(wire.side);
+    return true;
+}
+
+inline bool deserialise(const uint8_t* src, CancelOrder& msg) {
+    WireCancelOrder wire;
+    std::memcpy(&wire, src, sizeof(wire));
+    msg.id = wire.order_id;
+    return true;
+}
+
+inline bool deserialise(const uint8_t* src, ModifyOrder& msg) {
+    WireModifyOrder wire;
+    std::memcpy(&wire, src, sizeof(wire));
+    msg.id           = wire.order_id;
+    msg.new_price    = wire.new_price;
+    msg.new_quantity = wire.new_quantity;
     return true;
 }

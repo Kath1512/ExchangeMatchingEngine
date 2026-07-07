@@ -29,13 +29,13 @@ bool test_add_order_emits_accepted()
     Event ev;
     // BookUpdate fires first (level created), then OrderRested
     CHECK(sink.pop(ev));
-    CHECK(std::holds_alternative<BookUpdate>(ev));
-    CHECK(std::get<BookUpdate>(ev).new_total_quantity == 10);
+    CHECK(is_public<BookUpdate>(ev));
+    CHECK(get_public<BookUpdate>(ev).new_total_quantity == 10);
 
     CHECK(sink.pop(ev));
-    CHECK(std::holds_alternative<OrderRested>(ev));
-    CHECK(std::get<OrderRested>(ev).order_id == 1);
-    CHECK(std::get<OrderRested>(ev).remaining_quantity == 10);
+    CHECK(is_private<OrderRested>(ev));
+    CHECK(get_private<OrderRested>(ev).order_id == 1);
+    CHECK(get_private<OrderRested>(ev).remaining_quantity == 10);
 
     return true;
 }
@@ -54,12 +54,12 @@ bool test_cancel_order_emits_canceled()
 
     // BookUpdate fires first (level gone, qty=0), then OrderCanceled
     CHECK(sink.pop(ev));
-    CHECK(std::holds_alternative<BookUpdate>(ev));
-    CHECK(std::get<BookUpdate>(ev).new_total_quantity == 0);
+    CHECK(is_public<BookUpdate>(ev));
+    CHECK(get_public<BookUpdate>(ev).new_total_quantity == 0);
 
     CHECK(sink.pop(ev));
-    CHECK(std::holds_alternative<OrderCanceled>(ev));
-    CHECK(std::get<OrderCanceled>(ev).order_id == 1);
+    CHECK(is_private<OrderCanceled>(ev));
+    CHECK(get_private<OrderCanceled>(ev).order_id == 1);
 
     return true;
 }
@@ -72,7 +72,7 @@ bool test_cancel_unknown_order_emits_rejected()
 
     Event ev;
     CHECK(sink.pop(ev));
-    CHECK(std::holds_alternative<CancelRejected>(ev));
+    CHECK(is_private<CancelRejected>(ev));
 
     return true;
 }
@@ -87,25 +87,24 @@ bool test_matching_trade_emits_trade_executed()
     book.process_message(AddOrder{OrderType::Limit, TimeInForce::GoodTillCancel, 1, 100, 10, Side::Sell});
     sink.pop(ev);   // BookUpdate
     sink.pop(ev);   // OrderRested
-    CHECK(std::holds_alternative<OrderRested>(ev));
-    CHECK(std::get<OrderRested>(ev).order_id == 1);
+    CHECK(is_private<OrderRested>(ev));
+    CHECK(get_private<OrderRested>(ev).order_id == 1);
 
     // Aggressing buy (full fill) → TradeExecuted, BookUpdate{Ask,100,0}, OrderFilled{2}
     book.process_message(AddOrder{OrderType::Limit, TimeInForce::GoodTillCancel, 2, 100, 10, Side::Buy});
 
     CHECK(sink.pop(ev));
-    CHECK(std::holds_alternative<TradeExecuted>(ev));
-    const auto& trade = std::get<TradeExecuted>(ev);
-    CHECK(trade.price == 100);
-    CHECK(trade.quantity == 10);
+    CHECK(is_public<TradeExecuted>(ev));
+    CHECK(get_public<TradeExecuted>(ev).price == 100);
+    CHECK(get_public<TradeExecuted>(ev).quantity == 10);
 
     CHECK(sink.pop(ev));
-    CHECK(std::holds_alternative<BookUpdate>(ev));
-    CHECK(std::get<BookUpdate>(ev).new_total_quantity == 0);
+    CHECK(is_public<BookUpdate>(ev));
+    CHECK(get_public<BookUpdate>(ev).new_total_quantity == 0);
 
     CHECK(sink.pop(ev));
-    CHECK(std::holds_alternative<OrderFilled>(ev));
-    CHECK(std::get<OrderFilled>(ev).order_id == 2);
+    CHECK(is_private<OrderFilled>(ev));
+    CHECK(get_private<OrderFilled>(ev).order_id == 2);
 
     return true;
 }
@@ -122,20 +121,20 @@ bool test_event_fifo_order()
     Event ev;
 
     // Each add: BookUpdate then OrderRested
-    CHECK(sink.pop(ev)); CHECK(std::holds_alternative<BookUpdate>(ev));
+    CHECK(sink.pop(ev)); CHECK(is_public<BookUpdate>(ev));
     CHECK(sink.pop(ev));
-    CHECK(std::holds_alternative<OrderRested>(ev));
-    CHECK(std::get<OrderRested>(ev).order_id == 1);
+    CHECK(is_private<OrderRested>(ev));
+    CHECK(get_private<OrderRested>(ev).order_id == 1);
 
-    CHECK(sink.pop(ev)); CHECK(std::holds_alternative<BookUpdate>(ev));
+    CHECK(sink.pop(ev)); CHECK(is_public<BookUpdate>(ev));
     CHECK(sink.pop(ev));
-    CHECK(std::holds_alternative<OrderRested>(ev));
-    CHECK(std::get<OrderRested>(ev).order_id == 2);
+    CHECK(is_private<OrderRested>(ev));
+    CHECK(get_private<OrderRested>(ev).order_id == 2);
 
-    CHECK(sink.pop(ev)); CHECK(std::holds_alternative<BookUpdate>(ev));
+    CHECK(sink.pop(ev)); CHECK(is_public<BookUpdate>(ev));
     CHECK(sink.pop(ev));
-    CHECK(std::holds_alternative<OrderRested>(ev));
-    CHECK(std::get<OrderRested>(ev).order_id == 3);
+    CHECK(is_private<OrderRested>(ev));
+    CHECK(get_private<OrderRested>(ev).order_id == 3);
 
     return true;
 }
@@ -170,7 +169,7 @@ bool test_concurrent_consumer()
     // Each of 10 orders emits BookUpdate + OrderRested = 20 events total
     CHECK((int)received.size() == 20);
     for (const auto& e : received) {
-        CHECK(std::holds_alternative<BookUpdate>(e) || std::holds_alternative<OrderRested>(e));
+        CHECK(is_public<BookUpdate>(e) || is_private<OrderRested>(e));
     }
 
     return true;

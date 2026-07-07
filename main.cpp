@@ -59,3 +59,5 @@
 // int main(){
 //     test_event();
 // }
+
+int main() {}

@@ -74,6 +74,7 @@ add_library(order_book_lib STATIC
     src/helpers.cpp
     src/event_consumer.cpp
     src/order_event.cpp
+    src/message_consumer.cpp
 )
 
 # target_include_directories tells the compiler where to find #include files.
@@ -134,11 +135,13 @@ target_link_libraries(test_runner PRIVATE order_book_lib)
 # ── Networking library ────────────────────────────────────────────────────────
 #
 # Compiles all networking code (sender, parser, transport) into a static lib.
-# Depends on order_book_lib for Event, DefaultSink, etc.
+# Depends on order_book_lib for Event, EventSink, etc.
 
 add_library(networking_lib STATIC
-    networking/sender.cpp
-    networking/parser.cpp
+    networking/event_sender.cpp
+    networking/event_parser.cpp
+    networking/msg_sender.cpp
+    networking/msg_parser.cpp
     networking/input_handler.cpp
     networking/transport/tcp.cpp
 )

@@ -7,4 +7,4 @@
 
 using MaybeEvent = std::optional<Event>;
 
-void run_parser(int fd, DefaultSink& sink, AtomicBool& running);
+void run_parser(int fd, EventSink& sink, AtomicBool& running);

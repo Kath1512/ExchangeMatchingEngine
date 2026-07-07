@@ -2,7 +2,7 @@
 #include <cstring>
 
 static void server_handshake(int client_fd){
-    char message[] = "Hello server, send me some events!";
+    char message[] = "Hello server, I'm about to send some order";
     std::cout << "Waiting for message.....\n";
     char response[256];
     int got = recv_all(client_fd, reinterpret_cast<uint8_t*>(response), sizeof(message));
@@ -14,7 +14,7 @@ static void server_handshake(int client_fd){
 }
 
 static void client_handshake(int socket_fd){
-    char message[] = "Hello server, send me some events!";
+    char message[] = "Hello server, I'm about to send some order";
     auto sz = send_all(socket_fd, reinterpret_cast<uint8_t*>(&message), sizeof(message));
     if(got_error(sz)) return;
     std::cout << "Sent: " << sz << "\n";

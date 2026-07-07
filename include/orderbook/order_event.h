@@ -91,7 +91,7 @@ std::ostream& operator << (std::ostream& os, const BookUpdate& ev);
 
 std::string to_string(RejectReason reason);
 
-using Event = std::variant<
+using PrivateEvent = std::variant<
     OrderRested,
     OrderFilled,
     OrderExpired,
@@ -99,7 +99,16 @@ using Event = std::variant<
     OrderCanceled,
     CancelRejected,
     OrderModified,
-    ModifyRejected,
-    TradeExecuted,
-    BookUpdate
+    ModifyRejected
 >;
+
+using PublicEvent = std::variant<TradeExecuted, BookUpdate>;
+
+struct RoutedEvent {
+    int connection_id;
+    PrivateEvent event;
+};
+
+std::ostream& operator << (std::ostream& os, const RoutedEvent& ev);
+
+using Event = std::variant<RoutedEvent, PublicEvent>;

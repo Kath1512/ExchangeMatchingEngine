@@ -1,18 +1,20 @@
 #include "orderbook/event_consumer.h"
 
-void consume_events(DefaultSink& sink, AtomicBool& running) {
+template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+
+void consume_events(EventSink& sink, AtomicBool& running) {
     Event item;
-    // int cnt = 0;
     while (running || !sink.empty()) {
-        bool success = sink.pop(item);
-        // cnt++;
+        if(!sink.pop(item)) continue;
 
-        if(!success) continue;
-
-        std::visit([](auto&& event) {
-            std::cout << event << "\n";
+        std::visit(overloaded{
+            [](const RoutedEvent& ev) {
+                std::visit([&](auto&& inner){ std::cout << "[PRIVATE conn=" << ev.connection_id << "] " << inner << "\n"; }, ev.event);
+            },
+            [](const PublicEvent& ev) {
+                std::visit([](auto&& inner){ std::cout << "[PUBLIC] " << inner << "\n"; }, ev);
+            }
         }, item);
     }
-
-    // std::cout << "Total loops: " << cnt << "\n";
 }

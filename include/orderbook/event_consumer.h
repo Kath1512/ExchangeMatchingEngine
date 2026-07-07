@@ -4,7 +4,8 @@
 #include "ring_buffer.h"
 #include "constant.h"
 
-using DefaultSink = RingBuffer<Event, RING_BUFFER_SIZE>;
-// using DefaultBook = OrderBook<DefaultSink>;
+using EventSink = RingBuffer<Event, RING_BUFFER_SIZE>;
+using MessageSink = RingBuffer<Message, RING_BUFFER_SIZE>;
+// using DefaultBook = OrderBook<EventSink>;
 
-void consume_events(DefaultSink& sink, AtomicBool& running); //no need to drain from the book, just drain from the ring buffer
+void consume_events(EventSink& sink, AtomicBool& running); //no need to drain from the book, just drain from the ring buffer

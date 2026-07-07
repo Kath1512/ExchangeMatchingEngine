@@ -1,4 +1,5 @@
 #include "orderbook/order_event.h"
+#include <variant>
 
 
 
@@ -78,6 +79,11 @@ std::ostream& operator << (std::ostream& os, const BookUpdate& ev){
         ev.price,
         ev.new_total_quantity
     );
+    return os;
+}
+
+std::ostream& operator << (std::ostream& os, const RoutedEvent& ev){
+    std::visit([&](auto&& inner){ os << "[conn=" << ev.connection_id << "] " << inner; }, ev.event);
     return os;
 }
 

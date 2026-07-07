@@ -24,3 +24,25 @@ struct VectorSink {
 };
 
 using TestBook = OrderBook<VectorSink>;
+
+template<typename T>
+bool is_private(const Event& ev) {
+    if(!std::holds_alternative<RoutedEvent>(ev)) return false;
+    return std::holds_alternative<T>(std::get<RoutedEvent>(ev).event);
+}
+
+template<typename T>
+const T& get_private(const Event& ev) {
+    return std::get<T>(std::get<RoutedEvent>(ev).event);
+}
+
+template<typename T>
+bool is_public(const Event& ev) {
+    if(!std::holds_alternative<PublicEvent>(ev)) return false;
+    return std::holds_alternative<T>(std::get<PublicEvent>(ev));
+}
+
+template<typename T>
+const T& get_public(const Event& ev) {
+    return std::get<T>(std::get<PublicEvent>(ev));
+}

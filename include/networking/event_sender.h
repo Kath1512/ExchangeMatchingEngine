@@ -19,4 +19,4 @@ bool send_event(int fd, const EventT& event){
     return send_all(fd, buf.data(), buf.size()) != -1;
 }
 
-void run_sender(int fd, DefaultSink& sink, AtomicBool& running);
+void run_sender(int fd, EventSink& sink, AtomicBool& running);

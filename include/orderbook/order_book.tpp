@@ -146,7 +146,7 @@ Quantity OrderBook<EventSink>::execute_trade(Order& incoming_order, PriceLevel& 
 
     Trade trade = Trade::from_match(incoming_order, counterpart_level.front_order());
 
-    add_event(TradeExecuted{
+    add_public_event(TradeExecuted{
         .buyer_id        = trade.get_buyer().order_id_,
         .seller_id       = trade.get_seller().order_id_,
         .price           = trade.get_execution_price(),
@@ -165,7 +165,7 @@ Quantity OrderBook<EventSink>::execute_trade(Order& incoming_order, PriceLevel& 
     if(getFilled) remove_look_up(front_order_id);
 
     Side counterpart_side = incoming_order.is_buy() ? Side::Sell : Side::Buy;
-    add_event(BookUpdate{ counterpart_side, counterpart_level.get_price(), counterpart_level.get_total_quantity() });
+    add_public_event(BookUpdate{ counterpart_side, counterpart_level.get_price(), counterpart_level.get_total_quantity() });
 
     return execution_quantity;
 }
@@ -209,6 +209,7 @@ void OrderBook<EventSink>::process(const AddOrder& add_order_msg){
     OrderId book_id = next_order_id_++;
     OrderId cid = add_order_msg.client_order_id;
     TimeInForce tif = add_order_msg.time_in_force;
+    int conn = add_order_msg.connection_id;
 
     Order order(
         add_order_msg.order_type,
@@ -224,26 +225,26 @@ void OrderBook<EventSink>::process(const AddOrder& add_order_msg){
     switch(res.status_){
         case AddOrderStatus::Failed:
         case AddOrderStatus::Rejected:
-            add_event(OrderRejected{ .order_id = book_id, .reason = RejectReason::NoLiquidity });
+            add_private_event(conn, OrderRejected{ .order_id = book_id, .reason = RejectReason::NoLiquidity });
             return;
 
         case AddOrderStatus::FullyFilled:
-            add_event(OrderFilled{ .order_id = book_id, .client_order_id = cid });
+            add_private_event(conn, OrderFilled{ .order_id = book_id, .client_order_id = cid });
             return;
 
         case AddOrderStatus::Resting:
             if(tif == TimeInForce::ImmediateOrCancel){
-                add_event(OrderExpired{ .order_id = book_id, .client_order_id = cid });
+                add_private_event(conn, OrderExpired{ .order_id = book_id, .client_order_id = cid });
             } else {
-                add_event(OrderRested{ .order_id = book_id, .client_order_id = cid, .remaining_quantity = res.remaining_quantity_ });
+                add_private_event(conn, OrderRested{ .order_id = book_id, .client_order_id = cid, .remaining_quantity = res.remaining_quantity_ });
             }
             return;
 
         case AddOrderStatus::PartiallyFilled:
             if(tif == TimeInForce::GoodTillCancel){
-                add_event(OrderRested{ .order_id = book_id, .client_order_id = cid, .remaining_quantity = res.remaining_quantity_ });
+                add_private_event(conn, OrderRested{ .order_id = book_id, .client_order_id = cid, .remaining_quantity = res.remaining_quantity_ });
             } else {
-                add_event(OrderExpired{ .order_id = book_id, .client_order_id = cid });
+                add_private_event(conn, OrderExpired{ .order_id = book_id, .client_order_id = cid });
             }
             return;
     }
@@ -251,26 +252,32 @@ void OrderBook<EventSink>::process(const AddOrder& add_order_msg){
 
 template<typename EventSink>
 void OrderBook<EventSink>::process(const ModifyOrder& modify_order_msg){
-    auto [id, new_price, new_quantity] = modify_order_msg;
-    bool modified = modify_order(modify_order_msg.id, modify_order_msg.new_price, modify_order_msg.new_quantity);
+    OrderId id       = modify_order_msg.id;
+    Price new_price  = modify_order_msg.new_price;
+    Quantity new_qty = modify_order_msg.new_quantity;
+    int conn         = modify_order_msg.connection_id;
+
+    bool modified = modify_order(id, new_price, new_qty);
 
     if(!modified){
-        add_event(ModifyRejected{ .order_id = id, .reason = RejectReason::InvalidOrderId });
+        add_private_event(conn, ModifyRejected{ .order_id = id, .reason = RejectReason::InvalidOrderId });
         return;
     }
-    add_event(OrderModified{ .order_id = id, .new_price = new_price, .new_quantity = new_quantity });
+    add_private_event(conn, OrderModified{ .order_id = id, .new_price = new_price, .new_quantity = new_qty });
 }
 
 template<typename EventSink>
 void OrderBook<EventSink>::process(const CancelOrder& cancel_order_msg){
-    bool cancelled = cancel_order(cancel_order_msg.id);
     OrderId id = cancel_order_msg.id;
+    int conn   = cancel_order_msg.connection_id;
+
+    bool cancelled = cancel_order(id);
 
     if(!cancelled){
-        add_event(CancelRejected{ .order_id = id, .reason = RejectReason::InvalidOrderId });
+        add_private_event(conn, CancelRejected{ .order_id = id, .reason = RejectReason::InvalidOrderId });
         return;
     }
-    add_event(OrderCanceled{ .order_id = id });
+    add_private_event(conn, OrderCanceled{ .order_id = id });
 }
 
 template<typename EventSink>
@@ -279,8 +286,13 @@ void OrderBook<EventSink>::process_message(const Message& msg){
 }
 
 template<typename EventSink>
-bool OrderBook<EventSink>::add_event(Event event){
-    return event_sink_.push(std::move(event));
+bool OrderBook<EventSink>::add_private_event(int connection_id, PrivateEvent event){
+    return event_sink_.push(Event{ RoutedEvent{ connection_id, std::move(event) } });
+}
+
+template<typename EventSink>
+bool OrderBook<EventSink>::add_public_event(PublicEvent event){
+    return event_sink_.push(Event{ std::move(event) });
 }
 
 template<typename EventSink>

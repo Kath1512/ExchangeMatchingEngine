@@ -1,6 +1,8 @@
-#include "networking/parser.h"
+#include "networking/event_parser.h"
 #include "networking/transport/tcp.h"
+#include "networking/msg_sender.h"
 #include "orderbook/event_consumer.h"
+#include "networking/input_handler.h"
 #include <unistd.h>
 #include <iostream>
 #include <thread>
@@ -12,22 +14,29 @@ int main(){
         return 1;
     }
 
-    DefaultSink sink;
+    EventSink event_sink;
     AtomicBool running = true;
-    std::thread recv_thread(
+    std::thread event_recv_thread(
         run_parser,
         socket_fd,
-        std::reference_wrapper(sink),
+        std::reference_wrapper(event_sink),
         std::reference_wrapper(running)
     );
 
-    std::thread consumer_thread(
+    std::thread event_consumer_thread(
         consume_events,
-        std::reference_wrapper(sink),
+        std::reference_wrapper(event_sink),
         std::reference_wrapper(running)
     );
 
-    recv_thread.join();
-    consumer_thread.join();
+    std::optional<Message> msg;
+    while((msg = read_message()) != std::nullopt){
+        run_sender(socket_fd, *msg);
+    }
+
+    running = false;
+
+    event_recv_thread.join();
+    event_consumer_thread.join();
     close(socket_fd);
 }

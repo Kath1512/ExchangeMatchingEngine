@@ -157,7 +157,7 @@ public:
             order_it.value()
         );
 
-        add_event(BookUpdate{ side, price, it->second.get_total_quantity() });
+        add_public_event(BookUpdate{ side, price, it->second.get_total_quantity() });
 
         return inserted_in_look_up;
     }
@@ -228,7 +228,7 @@ public:
             levels.erase(level_it);
         }
 
-        add_event(BookUpdate{ side, price, new_qty });
+        add_public_event(BookUpdate{ side, price, new_qty });
 
         return true;
     }
@@ -278,8 +278,8 @@ public:
     void process_message(const Message& msg);
 
     //Event control
-    
-    bool add_event(Event event);
+    bool add_private_event(int connection_id, PrivateEvent event);
+    bool add_public_event(PublicEvent event);
 
     //debug method
     template<typename Levels>
