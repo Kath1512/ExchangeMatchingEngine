@@ -1,5 +1,5 @@
 # ════════════════════════════════════════════════════════════════════════════════
-#  CMakeLists.txt — MyOrderBook
+#  CMakeLists.txt — C++ Exchange Matching Engine
 #
 #  CMake is a build system *generator*. It doesn't compile your code directly;
 #  it reads this file and produces the actual build files (e.g. Makefiles or
@@ -13,7 +13,7 @@ cmake_minimum_required(VERSION 3.20)
 
 # Declares the project. Sets the name, version, and which languages are used.
 # LANGUAGES CXX tells CMake to only look for a C++ compiler (not C, Fortran, …).
-project(MyOrderBook VERSION 0.1.0 LANGUAGES CXX)
+project(ExchangeMatchingEngine VERSION 0.1.0 LANGUAGES CXX)
 
 
 # ── C++ standard ──────────────────────────────────────────────────────────────
