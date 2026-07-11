@@ -5,6 +5,8 @@
 #include <iostream>
 #include <cstdint>
 
+using MessageLen = uint64_t;
+
 inline bool got_error(int rt_val){
     if(rt_val == -1){
         std::cerr << "Error: " << strerror(errno) << "\n";

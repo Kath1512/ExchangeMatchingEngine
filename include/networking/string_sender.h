@@ -1,7 +1,6 @@
 #pragma once
 #include "networking/socket_utils.h"
-
-using MessageLen = uint64_t;
+#include <string>
 
 inline bool send_all_string(int fd, const std::string& msg){
     MessageLen sz = msg.size();
