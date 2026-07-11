@@ -1,4 +1,4 @@
-PROJECT_ROOT="/Users/alex/Documents/test/c++/MyOrderBook"
+PROJECT_ROOT="/Users/alex/Documents/test/c++/ExchangeMatchingEngine"
 
 cd "$PROJECT_ROOT"
 

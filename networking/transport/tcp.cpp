@@ -1,23 +1,22 @@
 #include "networking/transport/tcp.h"
+#include "networking/string_parser.h"
+#include "networking/string_sender.h"
 #include <cstring>
 
 static void server_handshake(int client_fd){
-    char message[] = "Hello server, I'm about to send some order";
     std::cout << "Waiting for message.....\n";
-    char response[256];
-    int got = recv_all(client_fd, reinterpret_cast<uint8_t*>(response), sizeof(message));
-    std::cout << "Got: " << got << "\n";
+    std::string response;
+    if(!recv_all_string(client_fd, response)) return;
 
     std::cout << "Response from client: " << response << "\n";
     std::cout << "----------------------------------------------------"
     "-------------------" << "\n";
 }
 
-static void client_handshake(int socket_fd){
-    char message[] = "Hello server, I'm about to send some order";
-    auto sz = send_all(socket_fd, reinterpret_cast<uint8_t*>(&message), sizeof(message));
-    if(got_error(sz)) return;
-    std::cout << "Sent: " << sz << "\n";
+static void client_handshake(int socket_fd, const std::string& name = "Anonymous"){
+    std::string greet = std::format("Hello from {}, I'm about to send some order", name);
+    if(!send_all_string(socket_fd, greet)) return;
+
     std::cout << "----------------------------------------------------"
     "-------------------" << "\n";
 }
@@ -41,6 +40,7 @@ bool setup_server(int& socket_fd, int& client_fd){
     if(got_error(listen_res)) return false;
     std::cout << "Listening on port 8080\n";
     //accept
+    
     sockaddr_in client_address{};
     socklen_t client_size = sizeof(client_address);
     client_fd = accept(
