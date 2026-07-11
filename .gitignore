@@ -1,0 +1,28 @@
+todo.md
+
+# Build output
+build/
+main
+test_run
+
+# Compiled object files
+*.o
+*.obj
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Sanitizer / debug artefacts
+*.dSYM/
+
+# Claude Code
+.claude/
+.cache/
+CLAUDE.md
+doc/
