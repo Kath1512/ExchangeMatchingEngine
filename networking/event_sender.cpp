@@ -1,44 +1,36 @@
 #include "networking/event_sender.h"
 
 
-void run_sender(int fd, EventSink& sink, AtomicBool& running){
+void run_sender(ClientStateList& state, std::mutex& state_mutex, EventSink& sink, AtomicBool& running){
     Event item;
     while (running || !sink.empty()) {
         bool success = sink.pop(item);
         if(!success) continue;
-
-        std::visit(overloaded{
-            [](const RoutedEvent& ev) {
-                std::visit([&](auto&& inner){ std::cout << "[PRIVATE conn=" << ev.connection_id << "] " << inner << "\n"; }, ev.event);
-            },
-            [](const PublicEvent& ev) {
-                std::visit([](auto&& inner){ std::cout << "[PUBLIC] " << inner << "\n"; }, ev);
-            }
-        }, item);
-        
         bool ok = std::visit(overloaded{
-            [fd](const RoutedEvent& ev) {
-                // Private: send to the originating client's fd
-                // (For now single client, so fd == ev.connection_id fd — use fd directly)
+            [](const RoutedEvent& ev) {
+                // Private: send to the originating client's client_fd
+                int client_fd = ev.connection_id;
                 return std::visit(overloaded{
-                    [fd](const OrderRested& e)    { return send_event<WireOrderRested>(fd, e); },
-                    [fd](const OrderFilled& e)    { return send_event<WireOrderFilled>(fd, e); },
-                    [fd](const OrderExpired& e)   { return send_event<WireOrderExpired>(fd, e); },
-                    [fd](const OrderRejected& e)  { return send_event<WireOrderRejected>(fd, e); },
-                    [fd](const OrderCanceled& e)  { return send_event<WireOrderCanceled>(fd, e); },
-                    [fd](const CancelRejected& e) { return send_event<WireCancelRejected>(fd, e); },
-                    [fd](const OrderModified& e)  { return send_event<WireOrderModified>(fd, e); },
-                    [fd](const ModifyRejected& e) { return send_event<WireModifyRejected>(fd, e); }
+                    [client_fd](const OrderRested& e)    { return send_event_private<WireOrderRested>(client_fd, e); },
+                    [client_fd](const OrderFilled& e)    { return send_event_private<WireOrderFilled>(client_fd, e); },
+                    [client_fd](const OrderExpired& e)   { return send_event_private<WireOrderExpired>(client_fd, e); },
+                    [client_fd](const OrderRejected& e)  { return send_event_private<WireOrderRejected>(client_fd, e); },
+                    [client_fd](const OrderCanceled& e)  { return send_event_private<WireOrderCanceled>(client_fd, e); },
+                    [client_fd](const CancelRejected& e) { return send_event_private<WireCancelRejected>(client_fd, e); },
+                    [client_fd](const OrderModified& e)  { return send_event_private<WireOrderModified>(client_fd, e); },
+                    [client_fd](const ModifyRejected& e) { return send_event_private<WireModifyRejected>(client_fd, e); }
                 }, ev.event);
             },
-            [fd](const PublicEvent& ev) {
-                // Public: broadcast to all (single client for now)
+            [&state, &state_mutex](const PublicEvent& ev) {
+                // Public: broadcast to all connected clients
                 return std::visit(overloaded{
-                    [fd](const TradeExecuted& e) { return send_event<WireTradeExecuted>(fd, e); },
-                    [fd](const BookUpdate& e)    { return send_event<WireBookUpdate>(fd, e); }
+                    [&state, &state_mutex](const TradeExecuted& e) { return send_event_public<WireTradeExecuted>(state, state_mutex, e); },
+                    [&state, &state_mutex](const BookUpdate& e)    { return send_event_public<WireBookUpdate>(state, state_mutex, e); }
                 }, ev);
             }
         }, item);
-        if(!ok) break;
+        if(!ok){
+            std::cerr << "Failed to deliver an event to one or more clients\n";
+        }
     }
 }

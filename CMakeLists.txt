@@ -142,6 +142,7 @@ add_library(networking_lib STATIC
     networking/event_parser.cpp
     networking/msg_sender.cpp
     networking/msg_parser.cpp
+    networking/client_state.cpp
     networking/input_handler.cpp
     networking/transport/tcp.cpp
 )
@@ -150,11 +151,11 @@ target_compile_options(networking_lib PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(networking_lib PUBLIC order_book_lib)
 
 
-# ── Server executable ─────────────────────────────────────────────────────────
+# ── Multi-client kqueue server executable ─────────────────────────────────────
 
-add_executable(server server_code/server.cpp)
-target_compile_options(server PRIVATE -Wall -Wextra -Wpedantic)
-target_link_libraries(server PRIVATE networking_lib)
+add_executable(server_kqueue server_code/multi_server_kqueue.cpp)
+target_compile_options(server_kqueue PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(server_kqueue PRIVATE networking_lib)
 
 
 # ── Client executable ─────────────────────────────────────────────────────────

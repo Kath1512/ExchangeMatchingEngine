@@ -3,28 +3,50 @@
 ## Architecture
 
 ```
-Client                                Server
-──────────────────────────────────────────────────────────
-stdin ──► msg_sender ──[TCP]──► msg_parser ──► MessageSink
-                                                    │
-                                              engine_thread
-                                                    │
-                                               OrderBook
-                                                    │
-                                              EventSink
-                                                    │
-event_consumer ◄── EventSink ◄── event_parser ◄── event_sender
+Client                                          Server
+────────────────────────────────────────────────────────────────────────────
+stdin ──► msg_sender ──[TCP]──►   kqueue event loop (setup_server)
+                                   │  non-blocking recv() per ready fd
+                                   │  per-client state machine (ClientState)
+                                   │  parses complete messages, budgeted
+                                   ▼
+                              MessageSink
+                                   │
+                             engine_thread
+                                   │
+                              OrderBook
+                                   │
+                              EventSink
+                                   │
+event_consumer ◄── EventSink ◄── event_parser ◄── event_sender_thread
+                                  (routes private events to the
+                                   originating client_fd, broadcasts
+                                   public events to all connected clients)
 ```
 
-**Server threads**
-- `msg_parser_thread` — receives binary order messages from client socket → `MessageSink`
-- `engine_thread` — drains `MessageSink`, calls `OrderBook::process()`, generates events → `EventSink`
-- `event_sender_thread` — drains `EventSink`, serialises events, sends over socket
+**Server**
+- Main thread — runs the kqueue accept/read loop (`setup_server`). One `kqueue()` handles every connected client: on wakeup, it non-blocking `recv()`s into that client's buffer and drives its per-client `ClientState` state machine to parse as many complete messages as the buffered bytes allow (capped by `MSG_LIMIT_PER_CONN` per wakeup, so one busy client can't starve the others). Completed messages are pushed to `MessageSink`.
+- `engine_thread` — drains `MessageSink`, calls `OrderBook::process()`, generates events → `EventSink`.
+- `event_sender_thread` — drains `EventSink`, serialises events, and either sends a private event straight to the originating client's fd or broadcasts a public event to every fd in the shared connection map (`fd_to_state`). That map is written by the kqueue loop (accept/disconnect) and read by this thread, so both sides take a shared `std::mutex` around it.
 
-**Client threads**
-- Main thread — reads orders from stdin, serialises, sends to server
-- `event_recv_thread` — receives binary events from server → `EventSink`
-- `event_consumer_thread` — drains `EventSink`, prints to stdout
+**Client**
+- Main thread — reads orders from stdin (reprompts on invalid/unknown input instead of quitting), serialises, sends to server.
+- `event_recv_thread` — receives binary events from server → `EventSink`.
+- `event_consumer_thread` — drains `EventSink`, prints to stdout.
+
+---
+
+## Non-blocking parsing (`ClientState`)
+
+Each connected client owns one `ClientState`:
+
+- A fixed byte buffer (`STATE_SIZE` bytes) with `read_pos`/`write_pos` cursors — bytes between them are received but not yet parsed.
+- A `ParseState` (`ReadingHeader` / `ReadingPayload`) so parsing can resume across kqueue wakeups instead of blocking.
+- The in-progress `OrderMsgHeader`, kept once read so a resumed parse doesn't need to re-read it.
+
+`pre_check()` compacts the buffer before each `recv()`: if everything's been consumed it just resets both cursors (O(1)); if the tail is full but a partial message remains, it `memmove`s the unconsumed bytes to the front.
+
+An unrecognised message type doesn't kill the connection — `payload_len` bytes are drained (same atomic all-or-nothing read as any known payload, so it correctly waits across wakeups for the rest to arrive) and the parser resyncs at the next header.
 
 ---
 
@@ -38,18 +60,18 @@ cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build
 
 **Step 2 — Start server** (Terminal 1)
 ```bash
-./build/server
+./build/server_kqueue
 ```
 Wait for:
 ```
 Listening on port 8080
 ```
 
-**Step 3 — Start client** (Terminal 2)
+**Step 3 — Start client(s)** (Terminal 2, 3, ...)
 ```bash
 ./build/client
 ```
-Server prints `Client connected`. Enter orders on the client terminal.
+Server prints `Client connected` for each one. Enter orders on any client terminal — the server handles multiple clients concurrently over a single kqueue loop.
 
 ---
 
@@ -61,29 +83,31 @@ include/
         types.h              — Price, Quantity, OrderId, Side, TimeInForce aliases
         order_messages.h     — AddOrder, CancelOrder, ModifyOrder, Message variant
         order_event.h        — PrivateEvent, PublicEvent, RoutedEvent, Event variant
-        order_book.h         — OrderBook<EventSink> template
+        order_book.h          — OrderBook<EventSink> template
         ring_buffer.h        — SPSC lock-free ring buffer
         event_consumer.h     — EventSink alias, consume_events declaration
         message_consumer.h   — MessageSink, DefaultBook aliases, consume_messages declaration
-        constant.h           — RING_BUFFER_SIZE
+        constant.h           — RING_BUFFER_SIZE, STATE_SIZE, MSG_LIMIT_PER_CONN
     networking/
         protocol.h           — binary wire protocol (MsgType, OrderMsgType, ser/deser)
-        event_sender.h       — run_sender (EventSink → socket)
+        client_state.h       — ClientState: per-connection buffer, cursors, parse state
+        event_sender.h       — run_sender (EventSink → socket, private route / public broadcast)
         event_parser.h       — run_parser (socket → EventSink)
         msg_sender.h         — run_sender (Message → socket)
-        msg_parser.h         — run_parser (socket → MessageSink)
-        socket_utils.h       — send_all, recv_all
+        msg_parser.h         — parse_ready_client (ClientState → MessageSink)
+        socket_utils.h       — send_all, recv_all, recv_nb_til_limit
         input_handler.h      — read_message (stdin → Message)
         transport/
-            tcp.h            — setup_server, setup_client
+            tcp.h            — setup_server (kqueue loop), setup_client
 
 networking/
-    event_sender.cpp         — pops events from EventSink, serialises, routes to client fd
+    client_state.cpp         — ClientState method implementations
+    event_sender.cpp         — pops events from EventSink, serialises, routes/broadcasts
     event_parser.cpp         — receives event bytes, deserialises, pushes to EventSink
     msg_sender.cpp           — serialises Message, sends over socket
-    msg_parser.cpp           — receives order bytes, stamps connection_id, pushes to MessageSink
+    msg_parser.cpp           — parses buffered bytes into Messages via the ClientState machine
     input_handler.cpp        — reads one Message from stdin
-    transport/tcp.cpp        — TCP server/client setup
+    transport/tcp.cpp        — kqueue-based multi-client server; TCP client connect
 
 src/
     order_book.cpp           — matching engine (price-time priority, GTC/IOC/FOK)
@@ -92,8 +116,8 @@ src/
     order_event.cpp          — ostream operators for all event types
     order.cpp / price_level.cpp / trade.cpp / helpers.cpp
 
-server_code/server.cpp       — server main: TCP accept + 3 threads
-client_code/client.cpp       — client main: TCP connect + 2 threads + stdin loop
+server_code/multi_server_kqueue.cpp — server main: kqueue accept/parse loop + engine + sender threads
+client_code/client.cpp               — client main: TCP connect + 2 threads + stdin loop
 ```
 
 ---
@@ -152,6 +176,7 @@ Enter message type | 1: Add Order | 2: Modify Order | 3: Cancel Order | -1: Quit
 **tif:** `0` = FOK, `1` = GTC, `2` = IOC
 
 > Note: `client_order_id` is your reference number. The book assigns its own internal `order_id` sequentially.
+> Anything other than `1`, `2`, `3`, or `-1` (or non-numeric input) just reprompts — it no longer quits the client.
 
 ---
 

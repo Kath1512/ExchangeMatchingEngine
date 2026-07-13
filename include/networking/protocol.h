@@ -293,7 +293,7 @@ inline bool deserialise(const uint8_t* src, BookUpdate& ev) {
 enum class OrderMsgType : uint8_t {
     AddOrder    = 1,
     CancelOrder = 2,
-    ModifyOrder = 3,
+    ModifyOrder = 3
 };
 
 // ── Header ────────────────────────────────────────────────────────────────────
