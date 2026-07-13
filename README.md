@@ -2,27 +2,69 @@
 
 ## Architecture
 
+### Multi-client server — single kqueue loop, many connections
+
 ```
-Client                                          Server
-────────────────────────────────────────────────────────────────────────────
-stdin ──► msg_sender ──[TCP]──►   kqueue event loop (setup_server)
-                                   │  non-blocking recv() per ready fd
-                                   │  per-client state machine (ClientState)
-                                   │  parses complete messages, budgeted
-                                   ▼
-                              MessageSink
-                                   │
-                             engine_thread
-                                   │
-                              OrderBook
-                                   │
-                              EventSink
-                                   │
-event_consumer ◄── EventSink ◄── event_parser ◄── event_sender_thread
-                                  (routes private events to the
-                                   originating client_fd, broadcasts
-                                   public events to all connected clients)
+ Client A (fd 5)        Client B (fd 6)        Client C (fd 7)
+ stdin ► msg_sender     stdin ► msg_sender     stdin ► msg_sender
+     │  [TCP send]          │  [TCP send]          │  [TCP send]
+     ▼                      ▼                      ▼
+ ┌──────────────────────────────────────────────────────────────────┐
+ │                    kqueue()  — one fd, one thread                │
+ │                                                                    │
+ │   kevent() blocks, wakes with a batch of ready fds:               │
+ │     [listen_fd] [fd 5] [fd 7]              (fd 6 idle this tick)  │
+ │                                                                    │
+ │   listen_fd ready ──► accept() ──► set_non_blocking()             │
+ │                       ──► fd_to_state.insert({fd, ClientState})   │
+ │                       ──► kevent(EV_ADD, fd)   [mutex-guarded]    │
+ │                                                                    │
+ │   client fd ready ──► fd_to_state.at(fd)   (per-connection state) │
+ │        │                                                          │
+ │        ▼                                                          │
+ │   ┌─────────────────────────────────────────────────┐            │
+ │   │ ClientState (fd 5)     ClientState (fd 6)   ...  │            │
+ │   │ ┌───────────────┐      ┌───────────────┐         │            │
+ │   │ │ buf[STATE_SIZE]│      │ buf[STATE_SIZE]│        │            │
+ │   │ │ read_pos ▲     │      │ read_pos ▲     │        │            │
+ │   │ │ write_pos ▲    │      │ write_pos ▲    │        │            │
+ │   │ │ ParseState:    │      │ ParseState:    │        │            │
+ │   │ │  ReadingHeader │      │  ReadingPayload│        │            │
+ │   │ │  /ReadingPayload      │  (resumed here)│        │            │
+ │   │ │ pending_header │      │ pending_header │        │            │
+ │   │ └───────────────┘      └───────────────┘         │            │
+ │   └─────────────────────────────────────────────────┘            │
+ │        │                                                          │
+ │        │  pre_check() → recv_nb_til_limit() → parse_ready_client()│
+ │        │  parses up to MSG_LIMIT_PER_CONN complete messages       │
+ │        │  per wakeup (fairness — one chatty client can't          │
+ │        │  starve fd 6/fd 7), each stamped with connection_id=fd   │
+ │        ▼                                                          │
+ └──────────────────────────────  push()  ───────────────────────────┘
+                                    │
+                                    ▼
+                              MessageSink (SPSC ring buffer)
+                                    │
+                              engine_thread
+                                    │  OrderBook::process()
+                                    ▼
+                               EventSink
+                                    │
+                          event_sender_thread
+                                    │
+              ┌─────────────────────┴─────────────────────┐
+              ▼                                             ▼
+      RoutedEvent{connection_id}                     PublicEvent
+      send straight to that fd                 broadcast to every fd in
+      (e.g. OrderRested → fd 5 only)           fd_to_state (TradeExecuted,
+                                                 BookUpdate → fd 5,6,7)
+              │                                             │
+              ▼                                             ▼
+        Client A only                          Client A + Client B + Client C
+     event_recv_thread ► EventSink ► event_consumer_thread ► stdout
 ```
+
+`fd_to_state` (the `unordered_map<int, ClientState>`) is the one piece of state touched from two different threads — the kqueue loop inserts on accept and erases on disconnect, while `event_sender_thread` iterates it to broadcast. Both sides take the same `std::mutex` around those operations.
 
 **Server**
 - Main thread — runs the kqueue accept/read loop (`setup_server`). One `kqueue()` handles every connected client: on wakeup, it non-blocking `recv()`s into that client's buffer and drives its per-client `ClientState` state machine to parse as many complete messages as the buffered bytes allow (capped by `MSG_LIMIT_PER_CONN` per wakeup, so one busy client can't starve the others). Completed messages are pushed to `MessageSink`.
