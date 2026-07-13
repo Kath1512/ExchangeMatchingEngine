@@ -9,38 +9,38 @@
  stdin ► msg_sender     stdin ► msg_sender     stdin ► msg_sender
      │  [TCP send]          │  [TCP send]          │  [TCP send]
      ▼                      ▼                      ▼
- ┌──────────────────────────────────────────────────────────────────┐
- │                    kqueue()  — one fd, one thread                │
+ ┌────────────────────────────────────────────────────────────────────┐
+ │                    kqueue()  — one fd, one thread                  │
  │                                                                    │
- │   kevent() blocks, wakes with a batch of ready fds:               │
- │     [listen_fd] [fd 5] [fd 7]              (fd 6 idle this tick)  │
+ │   kevent() blocks, wakes with a batch of ready fds:                │
+ │     [listen_fd] [fd 5] [fd 7]              (fd 6 idle this tick)   │
  │                                                                    │
- │   listen_fd ready ──► accept() ──► set_non_blocking()             │
- │                       ──► fd_to_state.insert({fd, ClientState})   │
- │                       ──► kevent(EV_ADD, fd)   [mutex-guarded]    │
+ │   listen_fd ready ──► accept() ──► set_non_blocking()              │
+ │                       ──► fd_to_state.insert({fd, ClientState})    │
+ │                       ──► kevent(EV_ADD, fd)   [mutex-guarded]     │
  │                                                                    │
- │   client fd ready ──► fd_to_state.at(fd)   (per-connection state) │
- │        │                                                          │
- │        ▼                                                          │
- │   ┌─────────────────────────────────────────────────┐            │
- │   │ ClientState (fd 5)     ClientState (fd 6)   ...  │            │
- │   │ ┌───────────────┐      ┌───────────────┐         │            │
- │   │ │ buf[STATE_SIZE]│      │ buf[STATE_SIZE]│        │            │
- │   │ │ read_pos ▲     │      │ read_pos ▲     │        │            │
- │   │ │ write_pos ▲    │      │ write_pos ▲    │        │            │
- │   │ │ ParseState:    │      │ ParseState:    │        │            │
- │   │ │  ReadingHeader │      │  ReadingPayload│        │            │
- │   │ │  /ReadingPayload      │  (resumed here)│        │            │
- │   │ │ pending_header │      │ pending_header │        │            │
- │   │ └───────────────┘      └───────────────┘         │            │
- │   └─────────────────────────────────────────────────┘            │
- │        │                                                          │
- │        │  pre_check() → recv_nb_til_limit() → parse_ready_client()│
- │        │  parses up to MSG_LIMIT_PER_CONN complete messages       │
- │        │  per wakeup (fairness — one chatty client can't          │
- │        │  starve fd 6/fd 7), each stamped with connection_id=fd   │
- │        ▼                                                          │
- └──────────────────────────────  push()  ───────────────────────────┘
+ │   client fd ready ──► fd_to_state.at(fd)   (per-connection state)  │
+ │        │                                                           │
+ │        ▼                                                           │
+ │   ┌──────────────────────────────────────────────────┐             │
+ │   │ ClientState (fd 5)     ClientState (fd 6)   ...  │             │
+ │   │ ┌─────────────────┐       ┌────────────────┐     │             │
+ │   │ │ buf[STATE_SIZE] │       │ buf[STATE_SIZE]│     │             │
+ │   │ │ read_pos ▲      │       │ read_pos ▲     │     │             │
+ │   │ │ write_pos ▲     │       │ write_pos ▲    │     │             │
+ │   │ │ ParseState:     │       │ ParseState:    │     │             │
+ │   │ │  ReadingHeader  │       │  ReadingPayload│     │             │
+ │   │ │  /ReadingPayload│       │  (resumed here)│     │             │
+ │   │ │ pending_header  │       │ pending_header │     │             │
+ │   │ └─────────────────┘       └────────────────┘     │             │
+ │   └──────────────────────────────────────────────────┘             │
+ │        │                                                           │
+ │        │  pre_check() → recv_nb_til_limit() → parse_ready_client() │
+ │        │  parses up to MSG_LIMIT_PER_CONN complete messages        │
+ │        │  per wakeup (fairness — one chatty client can't           │
+ │        │  starve fd 6/fd 7), each stamped with connection_id=fd    │
+ │        ▼                                                           │
+ └──────────────────────────────  push()  ────────────────────────────┘
                                     │
                                     ▼
                               MessageSink (SPSC ring buffer)
