@@ -18,6 +18,7 @@ bool RingBuffer<T, Capacity>::push(const T& item){
     }
     buffer_[head] = item;
     head_.store(next_head, std::memory_order_release);
+    item_available_.release();
     return true;
 }
 
@@ -32,6 +33,7 @@ bool RingBuffer<T, Capacity>::push(T&& item){
     }
     buffer_[head] = std::move(item);
     head_.store(next_head, std::memory_order_release);
+    item_available_.release();
     return true;
 }
 
@@ -48,6 +50,12 @@ bool RingBuffer<T, Capacity>::pop(T& item){
     item = buffer_[tail];
     tail_.store(next_tail, std::memory_order_release);
     return true;
+}
+
+template<typename T, Size Capacity>
+bool RingBuffer<T, Capacity>::wait_pop(T& item, std::chrono::milliseconds timeout){
+    if(!item_available_.try_acquire_for(timeout)) return false;
+    return pop(item);
 }
 
 template<typename T, Size Capacity>

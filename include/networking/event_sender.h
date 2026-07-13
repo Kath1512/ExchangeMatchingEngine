@@ -38,4 +38,4 @@ bool send_event_public(ClientStateList& states, std::mutex& state_mutex, const E
     return all_ok;
 }
 
-void run_sender(ClientStateList& state, std::mutex& state_mutex, EventSink& sink, AtomicBool& running);
+void run_sender(ClientStateList& state, std::mutex& state_mutex, EventSink& sink, AtomicBool& running, bool block_mode);

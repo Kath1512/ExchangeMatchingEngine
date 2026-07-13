@@ -1,10 +1,12 @@
 #include "networking/event_sender.h"
 
 
-void run_sender(ClientStateList& state, std::mutex& state_mutex, EventSink& sink, AtomicBool& running){
+void run_sender(ClientStateList& state, std::mutex& state_mutex, EventSink& sink, AtomicBool& running, bool block_mode){
     Event item;
     while (running || !sink.empty()) {
-        bool success = sink.pop(item);
+        bool success = block_mode
+            ? sink.wait_pop(item, std::chrono::milliseconds(50))
+            : sink.pop(item);
         if(!success) continue;
         bool ok = std::visit(overloaded{
             [](const RoutedEvent& ev) {

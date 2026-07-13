@@ -3,10 +3,13 @@
 template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
-void consume_events(EventSink& sink, AtomicBool& running) {
+void consume_events(EventSink& sink, AtomicBool& running, bool block_mode) {
     Event item;
     while (running || !sink.empty()) {
-        if(!sink.pop(item)) continue;
+        bool got = block_mode
+            ? sink.wait_pop(item, std::chrono::milliseconds(50))
+            : sink.pop(item);
+        if(!got) continue;
 
         std::visit(overloaded{
             [](const RoutedEvent& ev) {

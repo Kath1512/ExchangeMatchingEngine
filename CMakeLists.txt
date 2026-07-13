@@ -153,14 +153,14 @@ target_link_libraries(networking_lib PUBLIC order_book_lib)
 
 # ── Multi-client kqueue server executable ─────────────────────────────────────
 
-add_executable(server_kqueue server_code/multi_server_kqueue.cpp)
+add_executable(server_kqueue server/multi_server_kqueue.cpp)
 target_compile_options(server_kqueue PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(server_kqueue PRIVATE networking_lib)
 
 
 # ── Client executable ─────────────────────────────────────────────────────────
 
-add_executable(client client_code/client.cpp)
+add_executable(client client/client.cpp)
 target_compile_options(client PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(client PRIVATE networking_lib)
 

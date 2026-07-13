@@ -92,6 +92,21 @@ An unrecognised message type doesn't kill the connection — `payload_len` bytes
 
 ---
 
+## Consumer wait mode: spin vs. block (`WAIT_MODE`)
+
+`engine_thread`, `event_sender_thread`, and the client's `event_consumer_thread` all drain a `RingBuffer` in a loop. By default they **busy-spin**: `pop()` returns immediately whether or not there's an item, so an empty buffer means the thread loops as fast as the CPU allows — lowest possible latency, but each such thread pins a full core even while idle.
+
+Set `WAIT_MODE=block` to make those same threads **sleep instead of spin**. Every `RingBuffer::push()` also releases a `std::counting_semaphore`; the consumer calls `wait_pop()`, which blocks on that semaphore (zero CPU) until an item is pushed, waking near-instantly when one arrives. The wait is capped at 50ms so a fully idle thread still periodically rechecks the shutdown flag rather than sleeping forever — this only adds latency to shutdown, not to message delivery.
+
+```bash
+WAIT_MODE=block ./build/server_kqueue   # low idle CPU
+WAIT_MODE=block ./build/client
+```
+
+Server and client pick their mode independently — they don't need to match. Leaving `WAIT_MODE` unset (or any value other than `block`) keeps the original spin behavior.
+
+---
+
 ## How to run
 
 **Step 1 — Build**
@@ -104,6 +119,10 @@ cmake -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build
 ```bash
 ./build/server_kqueue
 ```
+or, to run in blocking-wait mode instead of busy-spin:
+```bash
+WAIT_MODE=block ./build/server_kqueue
+```
 Wait for:
 ```
 Listening on port 8080
@@ -112,6 +131,10 @@ Listening on port 8080
 **Step 3 — Start client(s)** (Terminal 2, 3, ...)
 ```bash
 ./build/client
+```
+or
+```bash
+WAIT_MODE=block ./build/client
 ```
 Server prints `Client connected` for each one. Enter orders on any client terminal — the server handles multiple clients concurrently over a single kqueue loop.
 
@@ -126,7 +149,7 @@ include/
         order_messages.h     — AddOrder, CancelOrder, ModifyOrder, Message variant
         order_event.h        — PrivateEvent, PublicEvent, RoutedEvent, Event variant
         order_book.h          — OrderBook<EventSink> template
-        ring_buffer.h        — SPSC lock-free ring buffer
+        ring_buffer.h        — SPSC lock-free ring buffer + semaphore wait_pop
         event_consumer.h     — EventSink alias, consume_events declaration
         message_consumer.h   — MessageSink, DefaultBook aliases, consume_messages declaration
         constant.h           — RING_BUFFER_SIZE, STATE_SIZE, MSG_LIMIT_PER_CONN
@@ -139,6 +162,7 @@ include/
         msg_parser.h         — parse_ready_client (ClientState → MessageSink)
         socket_utils.h       — send_all, recv_all, recv_nb_til_limit
         input_handler.h      — read_message (stdin → Message)
+        wait_mode.h          — read_block_mode_from_env (WAIT_MODE env var)
         transport/
             tcp.h            — setup_server (kqueue loop), setup_client
 
@@ -158,8 +182,8 @@ src/
     order_event.cpp          — ostream operators for all event types
     order.cpp / price_level.cpp / trade.cpp / helpers.cpp
 
-server_code/multi_server_kqueue.cpp — server main: kqueue accept/parse loop + engine + sender threads
-client_code/client.cpp               — client main: TCP connect + 2 threads + stdin loop
+server/multi_server_kqueue.cpp — server main: kqueue accept/parse loop + engine + sender threads
+client/client.cpp               — client main: TCP connect + 2 threads + stdin loop
 ```
 
 ---

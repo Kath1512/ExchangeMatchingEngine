@@ -1,6 +1,7 @@
 #include "networking/event_parser.h"
 #include "networking/transport/tcp.h"
 #include "networking/msg_sender.h"
+#include "networking/wait_mode.h"
 #include "orderbook/event_consumer.h"
 #include "networking/input_handler.h"
 #include <unistd.h>
@@ -16,6 +17,7 @@ int main(){
 
     EventSink event_sink;
     AtomicBool running = true;
+    bool block_mode = read_block_mode_from_env();
     std::thread event_recv_thread(
         run_parser,
         socket_fd,
@@ -26,7 +28,8 @@ int main(){
     std::thread event_consumer_thread(
         consume_events,
         std::reference_wrapper(event_sink),
-        std::reference_wrapper(running)
+        std::reference_wrapper(running),
+        block_mode
     );
 
     std::optional<Message> msg;

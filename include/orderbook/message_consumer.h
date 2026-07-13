@@ -10,6 +10,7 @@ using DefaultBook = OrderBook<EventSink>;
 
 void consume_messages(
     DefaultBook& book,
-    MessageSink& sink, 
-    AtomicBool& running
+    MessageSink& sink,
+    AtomicBool& running,
+    bool block_mode
 ); //no need to drain from the book, just drain from the ring buffer
