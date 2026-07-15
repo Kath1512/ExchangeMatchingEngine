@@ -158,14 +158,35 @@ Quantity OrderBook<EventSink>::execute_trade(Order& incoming_order, PriceLevel& 
 
     bool getFilled = (counterpart_level.front_order().get_remaining_quantity() == execution_quantity);
     OrderId front_order_id = counterpart_level.front_order().get_order_id();
+    // Captured before fill_front_order() — a fully-filled front order is
+    // popped from the level by fill_front_order(), so front_order() would
+    // no longer refer to it afterward.
+    int maker_conn = counterpart_level.front_order().get_connection_id();
+    OrderId maker_cid = counterpart_level.front_order().get_client_order_id();
 
     incoming_order.fill_order(execution_quantity);
+
+    // Captured before fill_front_order() pops a fully-filled front order —
+    // needed for the maker's private event below either way, so grab it now.
+    Quantity maker_remaining_after_fill = counterpart_level.front_order().get_remaining_quantity() - execution_quantity;
+
     counterpart_level.fill_front_order(execution_quantity);
 
     if(getFilled) remove_look_up(front_order_id);
 
     Side counterpart_side = incoming_order.is_buy() ? Side::Sell : Side::Buy;
     add_public_event(BookUpdate{ counterpart_side, counterpart_level.get_price(), counterpart_level.get_total_quantity() });
+
+
+    if(getFilled){
+        add_private_event(maker_conn, OrderFilled{ .order_id = front_order_id, .client_order_id = maker_cid });
+    } else {
+        add_private_event(maker_conn, OrderRested{
+            .order_id = front_order_id,
+            .client_order_id = maker_cid,
+            .remaining_quantity = maker_remaining_after_fill
+        });
+    }
 
     return execution_quantity;
 }
@@ -218,7 +239,9 @@ void OrderBook<EventSink>::process(const AddOrder& add_order_msg){
         add_order_msg.price,
         add_order_msg.quantity,
         add_order_msg.side,
-        add_order_msg.seq
+        add_order_msg.seq,
+        conn,
+        cid
     );
     AddOrderResult res = add_order(std::move(order));
 

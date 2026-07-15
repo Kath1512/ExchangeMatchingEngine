@@ -18,6 +18,8 @@ private:
     Quantity remaining_quantity_;
     Side side_;
     SequenceNumber sequence_number_;
+    int connection_id_;
+    OrderId client_order_id_;
 public:
     static Order from_replacement(
         const Order& order,
@@ -31,7 +33,9 @@ public:
             new_price,
             new_quantity,
             order.get_side(),
-            order.get_sequence_number()
+            order.get_sequence_number(),
+            order.get_connection_id(),
+            order.get_client_order_id()
         );
     }
 
@@ -41,8 +45,10 @@ public:
           Price price,
           Quantity quantity,
           Side side,
-          SequenceNumber sequence_number);
-    
+          SequenceNumber sequence_number,
+          int connection_id,
+          OrderId client_order_id);
+
     Order(const Order& order);
 
     OrderType get_order_type() const;
@@ -54,6 +60,8 @@ public:
     Quantity get_filled_quantity() const;
     Side get_side() const;
     SequenceNumber get_sequence_number() const;
+    int get_connection_id() const;
+    OrderId get_client_order_id() const;
 
     bool is_filled() const;
     bool is_buy() const;

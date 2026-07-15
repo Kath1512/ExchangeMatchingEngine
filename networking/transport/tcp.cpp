@@ -40,24 +40,28 @@ static bool set_non_blocking(int fd){
 }
 
 
-// static void client_handshake(int socket_fd, const std::string& name = "Anonymous"){
-//     // std::string greet = std::format("Hello from {}, I'm about to send some order", name);
-//     // if(!send_all_string(socket_fd, greet)) return;
-
-//     std::cout << "----------------------------------------------------"
-//     "-------------------" << "\n";
-// }
-
-bool setup_server(MessageSink& sink, ClientStateList& fd_to_state, std::mutex& state_mutex){
+bool setup_server(
+    MessageSink& sink,
+    ClientStateList& fd_to_state,
+    std::mutex& state_mutex,
+    AtomicBool& running,
+    int port,
+    std::function<void()> on_ready
+){
     //create socket
     int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
     if(got_error(socket_fd)) return false;
+
+    //accept reusing port
+    int reuse = 1;
+    setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+
     //bind
     sockaddr_in server_address{};
 
     server_address.sin_family = AF_INET;
     server_address.sin_addr.s_addr = INADDR_ANY;
-    server_address.sin_port = htons(8080);
+    server_address.sin_port = htons(port);
 
     int bind_res = bind(socket_fd, reinterpret_cast<sockaddr*>(&server_address), sizeof(server_address));
     if(got_error(bind_res)) return false;
@@ -65,7 +69,7 @@ bool setup_server(MessageSink& sink, ClientStateList& fd_to_state, std::mutex& s
     //listen
     int listen_res = listen(socket_fd, 5);
     if(got_error(listen_res)) return false;
-    std::cout << "Listening on port 8080\n";
+    std::cout << std::format("Listening on port {}\n", port);
     //accept
     set_non_blocking(socket_fd);
 
@@ -92,19 +96,24 @@ bool setup_server(MessageSink& sink, ClientStateList& fd_to_state, std::mutex& s
         nullptr
     );
 
+    if(on_ready) on_ready();
+
     struct kevent events[64];
 
-    while(true){
+    
+    struct timespec poll_timeout{0, 100'000'000}; // 100ms
+
+    while(running){
         int nev = kevent(
             kq,
             nullptr,
             0,
             events,
             64,
-            nullptr
+            &poll_timeout
         );
-        
-        //handle each 
+
+        //handle each
         for(int i = 0; i < nev; i++){
             //if ident is listening socket -> register new event;
             if(events[i].ident == static_cast<unsigned long>(socket_fd)){
@@ -158,10 +167,21 @@ bool setup_server(MessageSink& sink, ClientStateList& fd_to_state, std::mutex& s
             }
         }
     }
+
+    // Graceful shutdown: close every connected client and the listen socket.
+    {
+        std::lock_guard<std::mutex> lock(state_mutex);
+        for(const auto& [fd, _] : fd_to_state){
+            close(fd);
+        }
+        fd_to_state.clear();
+    }
+    close(socket_fd);
+    close(kq);
     return true;
 }
 
-bool setup_client(int& socket_fd){
+bool setup_client(int& socket_fd, int port){
     //create socket
     socket_fd = socket(AF_INET, SOCK_STREAM, 0);
     if(got_error(socket_fd)) return false;
@@ -169,7 +189,7 @@ bool setup_client(int& socket_fd){
     sockaddr_in server_address{};
 
     server_address.sin_family = AF_INET;
-    server_address.sin_port = htons(8080);
+    server_address.sin_port = htons(port);
     inet_pton(AF_INET, "127.0.0.1", &server_address.sin_addr.s_addr);
 
     int connect_res = connect(

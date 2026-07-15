@@ -6,7 +6,9 @@ Order::Order(OrderType order_type,
              Price price,
              Quantity quantity,
              Side side,
-             SequenceNumber sequence_number)
+             SequenceNumber sequence_number,
+             int connection_id,
+             OrderId client_order_id)
     :   order_type_(order_type),
         time_in_force_(time_in_force),
         order_id_(order_id),
@@ -14,7 +16,9 @@ Order::Order(OrderType order_type,
         initial_quantity_(quantity),
         remaining_quantity_(quantity),
         side_(side),
-        sequence_number_(sequence_number){
+        sequence_number_(sequence_number),
+        connection_id_(connection_id),
+        client_order_id_(client_order_id){
             if(quantity <= 0){
                 throw std::logic_error("Order quantity cannot be smaller than or equal to 0");
             }
@@ -31,7 +35,10 @@ Order::Order(const Order& other)
         price_(other.get_price()),
         initial_quantity_(other.get_initial_quantity()),
         remaining_quantity_(other.get_remaining_quantity()),
-        side_(other.get_side()) {}
+        side_(other.get_side()),
+        sequence_number_(other.get_sequence_number()),
+        connection_id_(other.get_connection_id()),
+        client_order_id_(other.get_client_order_id()) {}
 
 OrderType Order::get_order_type() const {
     return order_type_;
@@ -67,6 +74,14 @@ Side Order::get_side() const {
 
 SequenceNumber Order::get_sequence_number() const {
     return sequence_number_;
+}
+
+int Order::get_connection_id() const {
+    return connection_id_;
+}
+
+OrderId Order::get_client_order_id() const {
+    return client_order_id_;
 }
 
 bool Order::is_filled() const {

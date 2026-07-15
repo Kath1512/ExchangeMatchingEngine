@@ -4,13 +4,7 @@
 #include "networking/protocol.h"
 #include "networking/socket_utils.h"
 #include "engine/event_consumer.h"
-
-template<class... Ts>
-struct overloaded : Ts... {
-    using Ts::operator()...; 
-};
-template<class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
+#include "common/overloaded.h"
 
 template<typename WireT, typename MsgT>
 bool send_msg(int fd, const MsgT& event){

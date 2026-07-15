@@ -37,7 +37,7 @@ int main(){
         block_mode
     );
 
-    if(!setup_server(msg_sink, fd_to_state, fd_to_state_mutex)){
+    if(!setup_server(msg_sink, fd_to_state, fd_to_state_mutex, running)){
         std::cerr << "Error occured!\n";
         return 1;
     }

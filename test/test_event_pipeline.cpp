@@ -90,7 +90,8 @@ bool test_matching_trade_emits_trade_executed()
     CHECK(is_private<OrderRested>(ev));
     CHECK(get_private<OrderRested>(ev).order_id == 1);
 
-    // Aggressing buy (full fill) → TradeExecuted, BookUpdate{Ask,100,0}, OrderFilled{2}
+    // Aggressing buy (full fill) → TradeExecuted, BookUpdate{Ask,100,0},
+    // OrderFilled{1} (maker's own confirmation, ERR-016), OrderFilled{2} (taker)
     book.process_message(AddOrder{OrderType::Limit, TimeInForce::GoodTillCancel, 2, 100, 10, Side::Buy});
 
     CHECK(sink.pop(ev));
@@ -101,6 +102,10 @@ bool test_matching_trade_emits_trade_executed()
     CHECK(sink.pop(ev));
     CHECK(is_public<BookUpdate>(ev));
     CHECK(get_public<BookUpdate>(ev).new_total_quantity == 0);
+
+    CHECK(sink.pop(ev));
+    CHECK(is_private<OrderFilled>(ev));
+    CHECK(get_private<OrderFilled>(ev).order_id == 1);
 
     CHECK(sink.pop(ev));
     CHECK(is_private<OrderFilled>(ev));

@@ -193,3 +193,10 @@ target_include_directories(test_event_pipeline PRIVATE test)
 target_compile_options(test_event_pipeline PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(test_event_pipeline PRIVATE order_book_lib)
 add_test(NAME event_pipeline_tests COMMAND test_event_pipeline)
+
+# E2E pipeline — drives the real kqueue server and real TCP clients over
+# the actual wire protocol (client -> server -> engine -> event -> client).
+add_executable(test_e2e_pipeline test/test_e2e_pipeline.cpp)
+target_compile_options(test_e2e_pipeline PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(test_e2e_pipeline PRIVATE networking_lib)
+add_test(NAME e2e_pipeline_tests COMMAND test_e2e_pipeline)

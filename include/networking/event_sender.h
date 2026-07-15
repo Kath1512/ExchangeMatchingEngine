@@ -6,14 +6,9 @@
 #include "networking/socket_utils.h"
 #include "engine/event_consumer.h"
 #include "networking/client_state.h"
+#include "common/overloaded.h"
 
 using ClientStateList = std::unordered_map<int, ClientState>;
-template<class... Ts>
-struct overloaded : Ts... {
-    using Ts::operator()...; 
-};
-template<class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
 
 constexpr int PUBLIC = -1;
 
