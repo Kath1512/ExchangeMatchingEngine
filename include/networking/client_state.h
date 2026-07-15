@@ -1,7 +1,7 @@
 #pragma once
 
 #include <array>
-#include "orderbook/constant.h"
+#include "networking/constant.h"
 #include "networking/protocol.h"
 
 using Byte = uint8_t;

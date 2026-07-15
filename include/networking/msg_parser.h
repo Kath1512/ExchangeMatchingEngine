@@ -3,9 +3,9 @@
 
 #include "networking/protocol.h"
 #include "networking/socket_utils.h"
-#include "orderbook/event_consumer.h"
+#include "engine/event_consumer.h"
 #include "networking/client_state.h"
-#include "orderbook/constant.h"
+#include "networking/constant.h"
 
 using MaybeMessage = std::optional<Message>;
 using MessageSink = RingBuffer<Message, RING_BUFFER_SIZE>;

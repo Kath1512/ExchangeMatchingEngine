@@ -3,7 +3,7 @@
 #include<array>
 #include<semaphore>
 #include<chrono>
-#include "types.h"
+#include "common/types.h"
 
 template<typename T, Size Capacity>
 class RingBuffer{

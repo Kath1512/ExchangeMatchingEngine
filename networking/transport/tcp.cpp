@@ -1,12 +1,13 @@
 #include "networking/transport/tcp.h"
 #include "networking/string_parser.h"
 #include "networking/string_sender.h"
+#include <algorithm>
 #include <cstring>
 
 
 static void print_detail(const sockaddr_in& client_address){
     std::cout << "Client connected\n";
-    std::cout << "Family: " << client_address.sin_family << "\n";
+    // std::cout << "Family: " << client_address.sin_family << "\n";
     char ip[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &client_address.sin_addr, ip, INET_ADDRSTRLEN);
     std::cout << "Address: " << ip  << "\n";
@@ -144,7 +145,8 @@ bool setup_server(MessageSink& sink, ClientStateList& fd_to_state, std::mutex& s
                 int client_fd = static_cast<int>(events[i].ident);
                 auto& state = fd_to_state.at(client_fd);
                 state.pre_check();
-                auto got = recv_nb_til_limit(client_fd, state.write_p(), state.write_limit());
+                size_t budget = std::min(state.write_limit(), READ_BYTE_BUDGET);
+                auto got = recv_nb_til_limit(client_fd, state.write_p(), budget);
                 if(got == -1 || got == -2){
                     close(client_fd);
                     std::lock_guard<std::mutex> lock(state_mutex);

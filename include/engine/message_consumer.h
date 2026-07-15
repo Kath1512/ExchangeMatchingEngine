@@ -1,8 +1,8 @@
 #pragma once
 
-#include "order_book.h"
-#include "ring_buffer.h"
-#include "constant.h"
+#include "orderbook/order_book.h"
+#include "common/ring_buffer.h"
+#include "engine/constant.h"
 
 using EventSink = RingBuffer<Event, RING_BUFFER_SIZE>;
 using MessageSink = RingBuffer<Message, RING_BUFFER_SIZE>;

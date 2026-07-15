@@ -59,22 +59,22 @@ endif()
 
 # ── Core library ──────────────────────────────────────────────────────────────
 #
-# Instead of compiling src/*.cpp into both executables separately,
-# we compile them once into a static library (.a file).
+# Instead of compiling orderbook/*.cpp and engine/*.cpp into both executables
+# separately, we compile them once into a static library (.a file).
 # Both main_app and test_runner then link against this one compiled artefact.
 #
 # STATIC = compiled into a .a file that gets bundled into the final executable.
 # (The alternative is SHARED = .dylib/.so, loaded at runtime — not needed here.)
 
 add_library(order_book_lib STATIC
-    src/order.cpp
-    src/price_level.cpp
-    src/order_book.cpp
-    src/trade.cpp
-    src/helpers.cpp
-    src/event_consumer.cpp
-    src/order_event.cpp
-    src/message_consumer.cpp
+    orderbook/order.cpp
+    orderbook/price_level.cpp
+    orderbook/order_book.cpp
+    orderbook/trade.cpp
+    orderbook/helpers.cpp
+    orderbook/order_event.cpp
+    engine/event_consumer.cpp
+    engine/message_consumer.cpp
 )
 
 # target_include_directories tells the compiler where to find #include files.

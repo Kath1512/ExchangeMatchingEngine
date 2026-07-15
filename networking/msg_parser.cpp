@@ -1,6 +1,9 @@
 #include "networking/msg_parser.h"
+#include <atomic>
 #include <vector>
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+static std::atomic<SequenceNumber> next_seq{1};
 
 template<typename WireT, typename MsgT>
 static MaybeMessage read_payload(ClientState& state) {
@@ -15,9 +18,13 @@ static MaybeMessage read_payload(ClientState& state) {
     return msg;
 }
 
-static void stamp_connection(MaybeMessage& m, int connection_id) {
+static void stamp_message(MaybeMessage& m, int connection_id) {
+    SequenceNumber seq = next_seq.fetch_add(1, std::memory_order_relaxed);
     std::visit(
-        [connection_id](auto& msg) { msg.connection_id = connection_id; },
+        [connection_id, seq](auto& msg) {
+            msg.connection_id = connection_id;
+            msg.seq = seq;
+        },
         m.value()
     );
 }
@@ -58,7 +65,7 @@ static void stamp_connection(MaybeMessage& m, int connection_id) {
 //         }
 
 //         if (m) {
-//             stamp_connection(m, connection_id);
+//             stamp_message(m, connection_id);
 //             sink.push(std::move(m.value()));
 //         }
 //     }
@@ -108,7 +115,7 @@ static bool parse_message(
 
         if(!m) return false;
 
-        stamp_connection(m, connection_id);
+        stamp_message(m, connection_id);
         sink.push(std::move(m.value()));
         state.parse_state = ParseState::ReadingHeader;
         return true;

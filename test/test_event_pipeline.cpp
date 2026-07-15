@@ -3,8 +3,8 @@
 #include <vector>
 #include <mutex>
 #include "orderbook/order_book.h"
-#include "orderbook/ring_buffer.h"
-#include "orderbook/constant.h"
+#include "common/ring_buffer.h"
+#include "engine/constant.h"
 #include "orderbook/order_messages.h"
 #include "test_sink.h"
 

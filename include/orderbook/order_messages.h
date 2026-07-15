@@ -17,6 +17,7 @@ struct AddOrder {
 struct CancelOrder {
     OrderId id;
     int connection_id = -1;
+    SequenceNumber seq = 1;
 };
 
 struct ModifyOrder {
@@ -24,6 +25,7 @@ struct ModifyOrder {
     Price new_price;
     Quantity new_quantity;
     int connection_id = -1;
+    SequenceNumber seq = 1;
 };
 
 using Message = std::variant<AddOrder, CancelOrder, ModifyOrder>;
